@@ -20,284 +20,6 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-async function fetchFavicon(url) {
-  try {
-    // Normalize URL
-    const urlObj = new URL(url);
-    const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
-
-    // Try common favicon locations with different formats
-    const faviconUrls = [
-      // Standard locations
-      `${baseUrl}/favicon.ico`,
-      `${baseUrl}/favicon.png`,
-      `${baseUrl}/favicon.svg`,
-      `${baseUrl}/favicon.webp`,
-
-      // Apple touch icons
-      `${baseUrl}/apple-touch-icon.png`,
-      `${baseUrl}/apple-touch-icon-precomposed.png`,
-      `${baseUrl}/apple-touch-icon-152x152.png`,
-      `${baseUrl}/apple-touch-icon-144x144.png`,
-      `${baseUrl}/apple-touch-icon-120x120.png`,
-      `${baseUrl}/apple-touch-icon-114x114.png`,
-      `${baseUrl}/apple-touch-icon-76x76.png`,
-      `${baseUrl}/apple-touch-icon-72x72.png`,
-      `${baseUrl}/apple-touch-icon-60x60.png`,
-
-      // Android icons
-      `${baseUrl}/android-chrome-512x512.png`,
-      `${baseUrl}/android-chrome-192x192.png`,
-      `${baseUrl}/android-chrome-144x144.png`,
-      `${baseUrl}/android-chrome-96x96.png`,
-      `${baseUrl}/android-chrome-72x72.png`,
-      `${baseUrl}/android-chrome-48x48.png`,
-
-      // Generic icons
-      `${baseUrl}/icon.png`,
-      `${baseUrl}/icon.svg`,
-      `${baseUrl}/logo.png`,
-      `${baseUrl}/logo.svg`,
-
-      // Common subdirectories
-      `${baseUrl}/assets/favicon.ico`,
-      `${baseUrl}/assets/favicon.png`,
-      `${baseUrl}/assets/icon.png`,
-      `${baseUrl}/static/favicon.ico`,
-      `${baseUrl}/static/favicon.png`,
-      `${baseUrl}/images/favicon.ico`,
-      `${baseUrl}/images/favicon.png`,
-      `${baseUrl}/img/favicon.ico`,
-      `${baseUrl}/img/favicon.png`
-    ];
-
-    // Try each favicon URL
-    for (const faviconUrl of faviconUrls) {
-      try {
-        const response = await axios.get(faviconUrl, {
-          responseType: 'arraybuffer',
-          timeout: 3000,
-          validateStatus: (status) => status < 400,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-          }
-        });
-
-        if (response.data && response.data.length > 0 && response.data.length < 2 * 1024 * 1024) {
-          const buffer = Buffer.from(response.data);
-          
-          // Validate that this is actually image data, not an HTML error page
-          const bufferStart = buffer.toString('utf8', 0, Math.min(100, buffer.length));
-          if (bufferStart.includes('<html') || bufferStart.includes('<!DOCTYPE') || bufferStart.includes('404')) {
-            console.warn('Favicon URL returned HTML instead of image:', faviconUrl);
-            continue;
-          }
-          
-          // Check for common image format signatures
-          const bufferHex = buffer.toString('hex', 0, 8);
-          const isValidImage = bufferHex.startsWith('89504e47') || // PNG
-                              bufferHex.startsWith('ffd8ff') ||   // JPEG
-                              bufferHex.startsWith('47494638') || // GIF
-                              bufferHex.startsWith('52494646') || // WebP/RIFF
-                              buffer.toString('utf8', 0, 5).includes('<svg'); // SVG
-          
-          if (isValidImage) {
-            console.log('Found valid favicon:', faviconUrl);
-            return buffer;
-          } else {
-            console.warn('Favicon URL returned invalid image format:', faviconUrl);
-          }
-        }
-      } catch (error) {
-        // Continue to next favicon URL
-        continue;
-      }
-    }
-
-    // If no favicon found, try to parse HTML for favicon links and manifest
-    try {
-      const response = await axios.get(url, {
-        timeout: 5000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-        }
-      });
-      const html = response.data;
-
-      // Look for manifest.json
-      const manifestMatch = html.match(/<link[^>]*rel=["']manifest["'][^>]*href=["']([^"']+)["'][^>]*>/i);
-      if (manifestMatch && manifestMatch[1]) {
-        try {
-          let manifestHref = manifestMatch[1].trim();
-          
-          // Skip invalid manifest URLs
-          if (!manifestHref || manifestHref === '/' || manifestHref === 'https' || manifestHref === 'http') {
-            // Skip invalid manifest URLs
-          } else {
-            const manifestUrl = manifestHref.startsWith('http') ? manifestHref :
-                              manifestHref.startsWith('//') ? `https:${manifestHref}` :
-                              manifestHref.startsWith('/') ? `${baseUrl}${manifestHref}` :
-                              `${baseUrl}/${manifestHref}`;
-
-            const manifestResponse = await axios.get(manifestUrl, { 
-              timeout: 3000,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-              }
-            });
-            const manifest = manifestResponse.data;
-
-            if (manifest && manifest.icons && Array.isArray(manifest.icons)) {
-              // Sort by size (prefer larger icons)
-              const sortedIcons = manifest.icons.sort((a, b) => {
-                const sizeA = parseInt(a.sizes?.split('x')[0] || 0);
-                const sizeB = parseInt(b.sizes?.split('x')[0] || 0);
-                return sizeB - sizeA;
-              });
-
-              for (const icon of sortedIcons) {
-                if (icon.src) {
-                  try {
-                    let iconSrc = icon.src.trim();
-                    
-                    // Skip invalid icon URLs
-                    if (!iconSrc || iconSrc === '/' || iconSrc === 'https' || iconSrc === 'http') {
-                      continue;
-                    }
-                    
-                    const iconUrl = iconSrc.startsWith('http') ? iconSrc :
-                                  iconSrc.startsWith('//') ? `https:${iconSrc}` :
-                                  iconSrc.startsWith('/') ? `${baseUrl}${iconSrc}` :
-                                  `${baseUrl}/${iconSrc}`;
-
-                    const iconResponse = await axios.get(iconUrl, {
-                      responseType: 'arraybuffer',
-                      timeout: 3000,
-                      headers: {
-                        'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-                      }
-                    });
-
-                    if (iconResponse.data && iconResponse.data.length > 0) {
-                      const buffer = Buffer.from(iconResponse.data);
-                      
-                      // Validate that this is actually image data
-                      const bufferStart = buffer.toString('utf8', 0, Math.min(100, buffer.length));
-                      if (bufferStart.includes('<html') || bufferStart.includes('<!DOCTYPE') || bufferStart.includes('404')) {
-                        console.warn('Manifest icon returned HTML instead of image:', iconUrl);
-                        continue;
-                      }
-                      
-                      // Check for valid image format
-                      const bufferHex = buffer.toString('hex', 0, 8);
-                      const isValidImage = bufferHex.startsWith('89504e47') || // PNG
-                                          bufferHex.startsWith('ffd8ff') ||   // JPEG
-                                          bufferHex.startsWith('47494638') || // GIF
-                                          bufferHex.startsWith('52494646') || // WebP/RIFF
-                                          buffer.toString('utf8', 0, 5).includes('<svg'); // SVG
-                      
-                      if (isValidImage) {
-                        console.log('Found valid manifest icon:', iconUrl);
-                        return buffer;
-                      } else {
-                        console.warn('Manifest icon returned invalid format:', iconUrl);
-                      }
-                    }
-                  } catch (error) {
-                    continue;
-                  }
-                }
-              }
-            }
-          }
-        } catch (error) {
-          // Manifest parsing failed, continue
-        }
-      }
-
-      // Look for favicon links in HTML with various rel attributes
-      const faviconRegex = /<link[^>]*rel=["'](?:shortcut )?(?:icon|apple-touch-icon|apple-touch-icon-precomposed)["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
-      let match;
-      const foundFavicons = [];
-
-      while ((match = faviconRegex.exec(html)) !== null) {
-        foundFavicons.push(match[1]);
-      }
-
-      // Try each found favicon
-      for (const faviconPath of foundFavicons) {
-        try {
-          let faviconHref = faviconPath.trim();
-          
-          // Skip invalid favicon URLs
-          if (!faviconHref || faviconHref === '/' || faviconHref === 'https' || faviconHref === 'http') {
-            continue;
-          }
-          
-          const faviconUrl = faviconHref.startsWith('http') ? faviconHref :
-                           faviconHref.startsWith('//') ? `https:${faviconHref}` :
-                           faviconHref.startsWith('/') ? `${baseUrl}${faviconHref}` :
-                           `${baseUrl}/${faviconHref}`;
-
-          const faviconResponse = await axios.get(faviconUrl, {
-            responseType: 'arraybuffer',
-            timeout: 3000,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-            }
-          });
-
-          if (faviconResponse.data && faviconResponse.data.length > 0) {
-            return Buffer.from(faviconResponse.data);
-          }
-        } catch (error) {
-          continue;
-        }
-      }
-
-      // Look for Open Graph images as fallback
-      const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["'][^>]*>/i);
-      if (ogImageMatch && ogImageMatch[1]) {
-        try {
-          let ogImageHref = ogImageMatch[1].trim();
-          
-          // Skip invalid OG image URLs
-          if (!ogImageHref || ogImageHref === '/' || ogImageHref === 'https' || ogImageHref === 'http') {
-            // Skip invalid URLs
-          } else {
-            const ogImageUrl = ogImageHref.startsWith('http') ? ogImageHref :
-                             ogImageHref.startsWith('//') ? `https:${ogImageHref}` :
-                             ogImageHref.startsWith('/') ? `${baseUrl}${ogImageHref}` :
-                             `${baseUrl}/${ogImageHref}`;
-
-            const ogResponse = await axios.get(ogImageUrl, {
-              responseType: 'arraybuffer',
-              timeout: 3000,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-              }
-            });
-
-            if (ogResponse.data && ogResponse.data.length > 0 && ogResponse.data.length < 2 * 1024 * 1024) {
-              return Buffer.from(ogResponse.data);
-            }
-          }
-        } catch (error) {
-          // Continue
-        }
-      }
-
-    } catch (error) {
-      console.error('HTML parsing failed:', error.message);
-    }
-
-    return null; // No favicon found
-  } catch (error) {
-    console.error('Error fetching favicon:', error);
-    return null;
-  }
-}
-
 // Color contrast utilities
 function hexToRgb(hex) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -378,31 +100,20 @@ function getOptimalTextColor(bgColor, currentTextColor = 'white') {
   return whiteContrast > blackContrast ? 'white' : 'black';
 }
 
-async function processLogo(url, quality = 'high', isWebsite = false) {
-  const cacheKey = `${url}_${quality}_${isWebsite ? 'website' : 'direct'}`;
+async function processLogo(url, quality = 'high') {
+  const cacheKey = `${url}_${quality}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey);
   
   try {
-    let buffer;
-    
-    if (isWebsite) {
-      // Fetch favicon from website
-      buffer = await fetchFavicon(url);
-      if (!buffer) {
-        console.warn('No favicon found for website:', url);
-        return null;
+    // Direct image URL
+    const response = await axios.get(url, { 
+      responseType: 'arraybuffer', 
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
       }
-    } else {
-      // Direct image URL
-      const response = await axios.get(url, { 
-        responseType: 'arraybuffer', 
-        timeout: 5000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
-        }
-      });
-      buffer = Buffer.from(response.data);
-    }
+    });
+    const buffer = Buffer.from(response.data);
     
     if (buffer.length > 2 * 1024 * 1024) {
       console.warn('Image too large for URL:', url);
@@ -441,41 +152,78 @@ async function processSvgImage(buffer, quality) {
 
     // Extract dimensions from SVG
     const viewBoxMatch = sanitizedSvg.match(/viewBox=["']([^"']+)["']/);
-    const widthMatch = sanitizedSvg.match(/width=["']?([0-9]+)["']?/);
-    const heightMatch = sanitizedSvg.match(/height=["']?([0-9]+)["']?/);
+    const widthMatch = sanitizedSvg.match(/width=["']?([0-9.]+)["']?/);
+    const heightMatch = sanitizedSvg.match(/height=["']?([0-9.]+)["']?/);
 
     let width = 32, height = 32; // default
 
     if (viewBoxMatch) {
       const viewBox = viewBoxMatch[1].split(/\s+/);
       if (viewBox.length >= 4) {
-        width = parseInt(viewBox[2]) || 32;
-        height = parseInt(viewBox[3]) || 32;
+        width = parseFloat(viewBox[2]) || 32;
+        height = parseFloat(viewBox[3]) || 32;
       }
     } else if (widthMatch && heightMatch) {
-      width = parseInt(widthMatch[1]) || 32;
-      height = parseInt(heightMatch[1]) || 32;
+      width = parseFloat(widthMatch[1]) || 32;
+      height = parseFloat(heightMatch[1]) || 32;
     }
 
-    // Ensure high-resolution dimensions
-    width = Math.max(24, Math.min(width, 400));
-    height = Math.max(24, Math.min(height, 400));
+    // Ensure high-resolution dimensions with better scaling
+    width = Math.max(24, Math.min(width, 512));
+    height = Math.max(24, Math.min(height, 512));
 
-    // Adjust for quality setting with higher resolution scaling
-    const scaleFactor = quality === 'ultra' ? 2.5 : quality === 'high' ? 2.0 : 1.5;
+    // Quality-based scaling for ultra-crisp rendering
+    const scaleFactor = quality === 'ultra' ? 3.0 : quality === 'high' ? 2.5 : 2.0;
     width = Math.round(width * scaleFactor);
     height = Math.round(height * scaleFactor);
 
-    // Enhance the SVG with quality attributes
+    // Enhance the SVG with ultra-high quality rendering attributes
     let enhancedSvg = sanitizedSvg;
-    if (!enhancedSvg.includes('shape-rendering')) {
-      enhancedSvg = enhancedSvg.replace('<svg', '<svg shape-rendering="geometricPrecision"');
+    
+    // Add or enhance quality attributes
+    const qualityAttributes = [
+      'shape-rendering="geometricPrecision"',
+      'text-rendering="optimizeLegibility"',
+      'color-rendering="optimizeQuality"',
+      'image-rendering="optimizeQuality"'
+    ];
+    
+    // Remove any existing quality attributes to avoid duplicates
+    enhancedSvg = enhancedSvg.replace(/shape-rendering="[^"]*"/g, '');
+    enhancedSvg = enhancedSvg.replace(/text-rendering="[^"]*"/g, '');
+    enhancedSvg = enhancedSvg.replace(/color-rendering="[^"]*"/g, '');
+    enhancedSvg = enhancedSvg.replace(/image-rendering="[^"]*"/g, '');
+    
+    // Add quality attributes to the root SVG element
+    enhancedSvg = enhancedSvg.replace('<svg', `<svg ${qualityAttributes.join(' ')}`);
+    
+    // Ensure proper viewBox and dimensions
+    if (!enhancedSvg.includes('viewBox')) {
+      enhancedSvg = enhancedSvg.replace('<svg', `<svg viewBox="0 0 ${width / scaleFactor} ${height / scaleFactor}"`);
     }
+    
+    // Add quality-enhancing CSS for ultra-crisp rendering
+    const qualityCSS = `
+      <style>
+        * {
+          shape-rendering: geometricPrecision;
+          text-rendering: optimizeLegibility;
+          color-rendering: optimizeQuality;
+          image-rendering: optimizeQuality;
+        }
+        path, circle, ellipse, line, polyline, polygon, rect {
+          vector-effect: non-scaling-stroke;
+        }
+      </style>
+    `;
+    
+    // Insert CSS after opening SVG tag
+    enhancedSvg = enhancedSvg.replace('<svg', `<svg`).replace('>', `>${qualityCSS}`);
 
     const base64 = Buffer.from(enhancedSvg).toString('base64');
     const dataUri = `data:image/svg+xml;base64,${base64}`;
     
-    console.log('Successfully processed SVG:', width, 'x', height);
+    console.log('Successfully processed enhanced SVG:', width, 'x', height, 'quality:', quality);
     return { dataUri, width, height };
   } catch (error) {
     console.error('Error processing SVG:', error.message);
@@ -519,36 +267,55 @@ async function processPixelImage(buffer, quality) {
     
     console.log('Processing pixel image:', metadata.format, metadata.width + 'x' + metadata.height);
     
-    // Calculate target dimensions for ultra-high quality (much larger)
-    const baseHeight = quality === 'ultra' ? 80 : quality === 'high' ? 64 : 48;
+    // Calculate target dimensions with much higher quality settings
+    const baseHeight = quality === 'ultra' ? 96 : quality === 'high' ? 80 : 64;
     const aspectRatio = metadata.width / metadata.height;
     let targetWidth = Math.round(baseHeight * aspectRatio);
     let targetHeight = baseHeight;
     
-    // Allow much larger dimensions for crisp rendering
-    const maxWidth = quality === 'ultra' ? 400 : quality === 'high' ? 320 : 240;
+    // Allow much larger dimensions for ultra-crisp rendering
+    const maxWidth = quality === 'ultra' ? 512 : quality === 'high' ? 384 : 256;
     if (targetWidth > maxWidth) {
       targetWidth = maxWidth;
       targetHeight = Math.round(targetWidth / aspectRatio);
     }
 
-    // Process with ultra-high quality settings and supersampling
+    // Ultra-high quality processing with advanced techniques
     let processedBuffer;
-    if (metadata.width < targetWidth * 2 && metadata.height < targetHeight * 2) {
-      // For small source images, use supersampling
-      const supersampleFactor = 2;
-      const supersampleWidth = targetWidth * supersampleFactor;
-      const supersampleHeight = targetHeight * supersampleFactor;
+    
+    // Determine if we need supersampling based on source image size
+    const needsSupersampling = metadata.width < targetWidth * 1.5 || metadata.height < targetHeight * 1.5;
+    
+    if (needsSupersampling && quality !== 'standard') {
+      // Multi-stage supersampling for crisp results
+      console.log('Applying supersampling for enhanced quality...');
       
-      const supersampledBuffer = await sharp(buffer)
+      const supersampleFactor = quality === 'ultra' ? 3 : 2.5;
+      const supersampleWidth = Math.round(targetWidth * supersampleFactor);
+      const supersampleHeight = Math.round(targetHeight * supersampleFactor);
+      
+      // Stage 1: Intelligent upscaling with edge enhancement
+      const stage1Buffer = await sharp(buffer)
         .resize(supersampleWidth, supersampleHeight, {
           fit: 'inside',
           withoutEnlargement: false,
           kernel: 'lanczos3',
           fastShrinkOnLoad: false
         })
-        .modulate({ brightness: 1.02, saturation: 1.05 }) // Enhance colors slightly
-        .sharpen({ sigma: 0.3, m1: 1.0, m2: 2.0 })
+        .linear(1.05, -2) // Slight gamma adjustment for clarity
+        .modulate({ 
+          brightness: 1.02, 
+          saturation: 1.08,  // Enhanced saturation for vibrant colors
+          hue: 0 
+        })
+        .sharpen({ 
+          sigma: 0.5, 
+          m1: 1.2,   // Edge enhancement
+          m2: 2.5,   // Strong edge detection
+          x1: 2,     // Threshold
+          y2: 10,    // Maximum gain
+          y3: 20     // Maximum gain at high amplitude
+        })
         .png({
           quality: 100,
           compressionLevel: 0,
@@ -560,13 +327,25 @@ async function processPixelImage(buffer, quality) {
         })
         .toBuffer();
       
-      // Now downsample to target size with high quality
-      processedBuffer = await sharp(supersampledBuffer)
+      // Stage 2: High-quality downsampling with anti-aliasing
+      processedBuffer = await sharp(stage1Buffer)
         .resize(targetWidth, targetHeight, {
           fit: 'inside',
           withoutEnlargement: true,
           kernel: 'lanczos3',
           fastShrinkOnLoad: false
+        })
+        .sharpen({ 
+          sigma: 0.3, 
+          m1: 1.0, 
+          m2: 1.5,
+          x1: 2,
+          y2: 8,
+          y3: 15
+        })
+        .modulate({ 
+          brightness: 1.01, 
+          saturation: 1.03  // Final color enhancement
         })
         .png({
           quality: 100,
@@ -579,7 +358,9 @@ async function processPixelImage(buffer, quality) {
         })
         .toBuffer();
     } else {
-      // For high-res source images, direct processing
+      // Direct high-quality processing for already high-res images
+      console.log('Applying direct high-quality processing...');
+      
       processedBuffer = await sharp(buffer)
         .resize(targetWidth, targetHeight, {
           fit: 'inside',
@@ -587,8 +368,20 @@ async function processPixelImage(buffer, quality) {
           kernel: 'lanczos3',
           fastShrinkOnLoad: false
         })
-        .modulate({ brightness: 1.02, saturation: 1.05 }) // Enhance colors slightly
-        .sharpen({ sigma: 0.5, m1: 1.0, m2: 2.0 })
+        .linear(1.03, -1.5) // Contrast enhancement
+        .modulate({ 
+          brightness: 1.02, 
+          saturation: 1.06,
+          hue: 0 
+        })
+        .sharpen({ 
+          sigma: quality === 'ultra' ? 0.6 : 0.4, 
+          m1: 1.0, 
+          m2: quality === 'ultra' ? 2.2 : 1.8,
+          x1: 2,
+          y2: quality === 'ultra' ? 10 : 8,
+          y3: quality === 'ultra' ? 18 : 15
+        })
         .png({
           quality: 100,
           compressionLevel: 0,
@@ -601,18 +394,26 @@ async function processPixelImage(buffer, quality) {
         .toBuffer();
     }
 
-    // Convert to base64 and wrap in ultra-high-quality SVG
+    // Convert to base64 and create ultra-high-quality SVG wrapper
     const base64 = processedBuffer.toString('base64');
     const dataUri = `data:image/png;base64,${base64}`;
 
-    const svg = `<svg width="${targetWidth}" height="${targetHeight}" viewBox="0 0 ${targetWidth} ${targetHeight}" xmlns="http://www.w3.org/2000/svg" style="image-rendering: -webkit-optimize-contrast; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; image-rendering: pixelated;">
-      <image href="${dataUri}" width="${targetWidth}" height="${targetHeight}" x="0" y="0" style="image-rendering: -webkit-optimize-contrast; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; image-rendering: pixelated;"/>
+    // Enhanced SVG with optimal rendering hints
+    const svg = `<svg width="${targetWidth}" height="${targetHeight}" viewBox="0 0 ${targetWidth} ${targetHeight}" xmlns="http://www.w3.org/2000/svg" style="shape-rendering: geometricPrecision; image-rendering: -webkit-optimize-contrast; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;">
+      <defs>
+        <filter id="enhance" x="0%" y="0%" width="100%" height="100%">
+          <feComponentTransfer>
+            <feFuncA type="discrete" tableValues="0 .5 1"/>
+          </feComponentTransfer>
+        </filter>
+      </defs>
+      <image href="${dataUri}" width="${targetWidth}" height="${targetHeight}" x="0" y="0" style="image-rendering: -webkit-optimize-contrast; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; image-rendering: pixelated; filter: url(#enhance);"/>
     </svg>`;
 
     const svgBase64 = Buffer.from(svg).toString('base64');
     const svgDataUri = `data:image/svg+xml;base64,${svgBase64}`;
 
-    console.log('Successfully processed pixel image to SVG:', targetWidth, 'x', targetHeight);
+    console.log('Successfully processed pixel image to enhanced SVG:', targetWidth, 'x', targetHeight);
     return { dataUri: svgDataUri, width: targetWidth, height: targetHeight };
   } catch (error) {
     console.error('Error processing pixel image:', error.message);
@@ -622,21 +423,15 @@ async function processPixelImage(buffer, quality) {
 
 // Badge generation endpoint
 app.get('/badge', async (req, res) => {
-  const { text = 'Badge', color = 'blue', logo, website, textColor = 'white', fontFamily = 'Verdana, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif', autoContrast = 'true', logoQuality = 'high' } = req.query;
+  const { text = 'Badge', color = 'blue', logo, textColor = 'white', fontFamily = 'Verdana, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif', autoContrast = 'true', logoQuality = 'high' } = req.query;
   let logoData = null;
   
-  // Priority: website favicon > direct logo URL
-  if (website) {
-    console.log('Fetching favicon for website:', website);
-    logoData = await processLogo(website, logoQuality, true);
-    if (logoData) {
-      cache.set(`${website}_${logoQuality}_website`, logoData);
-    }
-  } else if (logo) {
+  // Process direct logo URL if provided
+  if (logo) {
     console.log('Processing direct logo URL:', logo);
-    logoData = await processLogo(logo, logoQuality, false);
+    logoData = await processLogo(logo, logoQuality);
     if (logoData) {
-      cache.set(`${logo}_${logoQuality}_direct`, logoData);
+      cache.set(`${logo}_${logoQuality}`, logoData);
     }
   }
 
@@ -649,10 +444,10 @@ app.get('/badge', async (req, res) => {
   const logoWidth = logoData ? logoData.width : 0;
   const logoHeight = logoData ? logoData.height : 24;
   
-  // Scale down large logos for badge display while keeping quality
+  // Scale down large logos for badge display while maintaining ultra-high quality
   let displayLogoWidth = logoWidth;
   let displayLogoHeight = logoHeight;
-  const maxDisplayHeight = 32;
+  const maxDisplayHeight = logoQuality === 'ultra' ? 40 : logoQuality === 'high' ? 36 : 32;
   
   if (logoHeight > maxDisplayHeight) {
     const scale = maxDisplayHeight / logoHeight;
@@ -660,25 +455,42 @@ app.get('/badge', async (req, res) => {
     displayLogoHeight = maxDisplayHeight;
   }
   
-  // Better text width calculation using modern font metrics
-  const avgCharWidth = 7.8;
+  // Enhanced text width calculation for better spacing
+  const avgCharWidth = fontFamily.includes('monospace') ? 8.5 : 7.8;
   const textWidth = Math.ceil(text.length * avgCharWidth);
   
-  const padding = 16;
-  const logoPadding = logoData ? 8 : 0;
-  const height = Math.max(40, displayLogoHeight + 8); // Accommodate larger logos
+  const padding = logoQuality === 'ultra' ? 18 : 16;
+  const logoPadding = logoData ? (logoQuality === 'ultra' ? 10 : 8) : 0;
+  const height = Math.max(logoQuality === 'ultra' ? 44 : 40, displayLogoHeight + 8);
   const totalWidth = padding + displayLogoWidth + logoPadding + textWidth + padding;
   
-  // Pixel-perfect positioning
+  // Ultra-precise positioning for pixel-perfect alignment
   const logoX = padding;
   const logoY = Math.round((height - displayLogoHeight) / 2);
   const textX = Math.round(padding + displayLogoWidth + logoPadding + textWidth / 2);
-  const textY = Math.round(height / 2 + 5.5);
+  const textY = Math.round(height / 2 + (logoQuality === 'ultra' ? 6 : 5.5));
   
-  const svg = `<svg width="${totalWidth}" height="${height}" viewBox="0 0 ${totalWidth} ${height}" xmlns="http://www.w3.org/2000/svg" style="shape-rendering: geometricPrecision; text-rendering: optimizeLegibility;">
-    <rect width="${totalWidth}" height="${height}" fill="${color}" rx="4" ry="4"/>
-    ${logoData ? `<image href="${logoData.dataUri}" x="${logoX}" y="${logoY}" width="${displayLogoWidth}" height="${displayLogoHeight}" style="image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;"/>` : ''}
-    <text x="${textX}" y="${textY}" text-anchor="middle" fill="${finalTextColor}" font-size="14" font-weight="500" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.02em;">${text}</text>
+  // Quality-specific rendering attributes
+  const qualityAttributes = logoQuality === 'ultra' 
+    ? 'shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" color-rendering="optimizeQuality"'
+    : logoQuality === 'high' 
+    ? 'shape-rendering="geometricPrecision" text-rendering="optimizeLegibility"'
+    : 'shape-rendering="auto" text-rendering="auto"';
+  
+  const svg = `<svg width="${totalWidth}" height="${height}" viewBox="0 0 ${totalWidth} ${height}" xmlns="http://www.w3.org/2000/svg" ${qualityAttributes}>
+    <defs>
+      ${logoQuality === 'ultra' ? `
+      <filter id="logoEnhance" x="0%" y="0%" width="100%" height="100%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="0" result="blur"/>
+        <feColorMatrix in="blur" type="matrix" values="1.02 0 0 0 0  0 1.02 0 0 0  0 0 1.02 0 0  0 0 0 1 0" result="enhanced"/>
+        <feComponentTransfer in="enhanced">
+          <feFuncA type="discrete" tableValues="0 .5 1"/>
+        </feComponentTransfer>
+      </filter>` : ''}
+    </defs>
+    <rect width="${totalWidth}" height="${height}" fill="${color}" rx="4" ry="4" style="shape-rendering: geometricPrecision;"/>
+    ${logoData ? `<image href="${logoData.dataUri}" x="${logoX}" y="${logoY}" width="${displayLogoWidth}" height="${displayLogoHeight}" style="image-rendering: -webkit-optimize-contrast; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges;${logoQuality === 'ultra' ? ' filter: url(#logoEnhance);' : ''}"/>` : ''}
+    <text x="${textX}" y="${textY}" text-anchor="middle" fill="${finalTextColor}" font-size="${logoQuality === 'ultra' ? '15' : '14'}" font-weight="500" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: ${logoQuality === 'ultra' ? '0.03em' : '0.02em'}; text-shadow: ${logoQuality === 'ultra' ? '0 0 1px rgba(0,0,0,0.1)' : 'none'};">${text}</text>
   </svg>`;
   
   res.setHeader('Content-Type', 'image/svg+xml');
