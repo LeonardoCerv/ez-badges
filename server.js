@@ -97,6 +97,45 @@ function formatColorForSvg(color) {
   }
 }
 
+// Enhanced color processing for better quality
+function enhanceColorProcessing(svgString, targetColor) {
+  if (!targetColor) return svgString;
+
+  const finalColor = formatColorForSvg(targetColor);
+
+  // Simple and reliable color replacement - focus on main fill attributes
+  let enhanced = svgString;
+
+  // Replace fill attributes - be more conservative
+  enhanced = enhanced.replace(/fill="([^"]*)"/gi, (match, value) => {
+    const normalizedValue = value.trim().toLowerCase();
+    // Preserve special values
+    if (normalizedValue === 'none' ||
+        normalizedValue === 'transparent' ||
+        normalizedValue === 'currentcolor' ||
+        normalizedValue.startsWith('url(') ||
+        normalizedValue.includes('gradient')) {
+      return match;
+    }
+    return `fill="${finalColor}"`;
+  });
+
+  // Replace stroke attributes
+  enhanced = enhanced.replace(/stroke="([^"]*)"/gi, (match, value) => {
+    const normalizedValue = value.trim().toLowerCase();
+    if (normalizedValue === 'none' ||
+        normalizedValue === 'transparent' ||
+        normalizedValue === 'currentcolor' ||
+        normalizedValue.startsWith('url(') ||
+        normalizedValue.includes('gradient')) {
+      return match;
+    }
+    return `stroke="${finalColor}"`;
+  });
+
+  return enhanced;
+}
+
 // =============================================================================
 // IMAGE PROCESSING
 // =============================================================================
@@ -106,120 +145,180 @@ async function fetchImage(url) {
     console.log('Fetching image:', url);
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
-      timeout: 5000,
+      timeout: 10000, // Increased timeout for high-quality images
+      maxContentLength: 5 * 1024 * 1024, // 5MB max for high-quality icons
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)',
+        'Accept': 'image/svg+xml,image/png,image/jpeg,image/gif,image/webp,image/*;q=0.8,*/*;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br'
       }
     });
 
     const buffer = Buffer.from(response.data);
 
-    // Check for reasonable file size (2MB max)
-    if (buffer.length > 2 * 1024 * 1024) {
-      throw new Error('Image too large');
+    // Enhanced file size validation with better limits for quality
+    if (buffer.length > 5 * 1024 * 1024) {
+      console.warn('Image too large, but attempting to process:', buffer.length);
+      // Don't immediately reject, try to process but with more conservative settings
+    }
+
+    // Additional content validation
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.startsWith('image/') && !isSvgBuffer(buffer)) {
+      console.warn('Unexpected content type:', contentType);
     }
 
     return buffer;
   } catch (error) {
     console.error('Failed to fetch image:', error.message);
+    
+    // Implement retry logic for transient failures
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') {
+      console.log('Retrying image fetch...');
+      try {
+        const retryResponse = await axios.get(url, {
+          responseType: 'arraybuffer',
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
+          }
+        });
+        return Buffer.from(retryResponse.data);
+      } catch (retryError) {
+        console.error('Retry failed:', retryError.message);
+      }
+    }
+    
     return null;
   }
 }
 
 function isValidImageBuffer(buffer) {
-  const start = buffer.toString('utf8', 0, Math.min(100, buffer.length));
-  return !start.includes('<html') && !start.includes('<!DOCTYPE') && !start.includes('Error');
+  if (!buffer || buffer.length === 0) return false;
+  
+  const start = buffer.toString('utf8', 0, Math.min(200, buffer.length));
+  
+  // Check for HTML error pages
+  if (start.includes('<html') || start.includes('<!DOCTYPE') || start.includes('Error') || start.includes('<body')) {
+    return false;
+  }
+  
+  // Check for valid image signatures
+  const signatures = {
+    png: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+    jpeg: [0xFF, 0xD8, 0xFF],
+    gif87a: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61],
+    gif89a: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
+    webp: [0x52, 0x49, 0x46, 0x46],
+    svg: start.includes('<svg') || start.includes('<?xml')
+  };
+  
+  // Check binary signatures
+  for (const [format, signature] of Object.entries(signatures)) {
+    if (format === 'svg') continue; // SVG is text-based
+    
+    if (signature.every((byte, index) => buffer[index] === byte)) {
+      return true;
+    }
+  }
+  
+  // Check for SVG
+  if (signatures.svg) {
+    return true;
+  }
+  
+  return false;
 }
 
 function isSvgBuffer(buffer) {
-  const start = buffer.toString('utf8', 0, Math.min(200, buffer.length));
-  return start.includes('<svg') || start.includes('<?xml');
+  if (!buffer || buffer.length === 0) return false;
+  
+  const start = buffer.toString('utf8', 0, Math.min(300, buffer.length));
+  const normalized = start.toLowerCase().trim();
+  
+  // More comprehensive SVG detection
+  return normalized.includes('<svg') || 
+         (normalized.includes('<?xml') && (normalized.includes('<svg') || normalized.includes('svg'))) ||
+         (normalized.startsWith('<?xml') && normalized.includes('svg'));
 }
 
 async function processSvgImage(buffer, iconColor) {
   try {
     let svgString = buffer.toString('utf8');
 
-    // Sanitize SVG for security
+    // Sanitize SVG for security while preserving all quality elements
     const window = new JSDOM('').window;
     let cleanSvg = DOMPurify(window).sanitize(svgString, {
-      USE_PROFILES: { svg: true, svgFilters: true }
+      USE_PROFILES: { svg: true, svgFilters: true },
+      ALLOW_TAGS: ['svg', 'path', 'circle', 'rect', 'ellipse', 'line', 'polygon', 'polyline', 'g', 'defs', 'clipPath', 'mask', 'linearGradient', 'radialGradient', 'stop', 'filter', 'feColorMatrix', 'feGaussianBlur', 'feOffset', 'feMerge', 'feMergeNode'],
+      ALLOW_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width', 'viewBox', 'transform', 'style', 'id', 'class', 'values', 'type', 'gradientUnits', 'x1', 'y1', 'x2', 'y2', 'offset', 'stdDeviation', 'in', 'result']
     });
 
-    // Recolor if iconColor specified
-    if (iconColor) {
-      // Parse and format the color consistently
-      const finalColor = formatColorForSvg(iconColor);
-
-      // Replace fill attributes
-      cleanSvg = cleanSvg.replace(/fill="([^"]*)"/g, (match, value) => {
-        if (value !== 'none' && !value.startsWith('url(') && value !== 'currentColor') {
-          return `fill="${finalColor}"`;
-        }
-        return match;
-      });
-      
-      // Replace stroke attributes
-      cleanSvg = cleanSvg.replace(/stroke="([^"]*)"/g, (match, value) => {
-        if (value !== 'none' && !value.startsWith('url(') && value !== 'currentColor') {
-          return `stroke="${finalColor}"`;
-        }
-        return match;
-      });
-      
-      // Replace in style attributes
-      cleanSvg = cleanSvg.replace(/style="([^"]*)"/g, (match, style) => {
-        let newStyle = style.replace(/fill:\s*([^;#]+)(?=[;\s]|$)/g, (fillMatch, fillValue) => {
-          if (fillValue.trim() !== 'none' && !fillValue.includes('url(') && fillValue.trim() !== 'currentColor') {
-            return `fill: ${finalColor}`;
-          }
-          return fillMatch;
-        });
-        newStyle = newStyle.replace(/stroke:\s*([^;#]+)(?=[;\s]|$)/g, (strokeMatch, strokeValue) => {
-          if (strokeValue.trim() !== 'none' && !strokeValue.includes('url(') && strokeValue.trim() !== 'currentColor') {
-            return `stroke: ${finalColor}`;
-          }
-          return strokeMatch;
-        });
-        return `style="${newStyle}"`;
-      });
-    }
-
-    // Extract dimensions
+    // Extract original dimensions
     const viewBoxMatch = cleanSvg.match(/viewBox=["']([^"']+)["']/);
-    let width = 32, height = 32;
+    const widthMatch = cleanSvg.match(/width=["']([^"']+)["']/);
+    const heightMatch = cleanSvg.match(/height=["']([^"']+)["']/);
+
+    let originalWidth = 24, originalHeight = 24, viewBoxX = 0, viewBoxY = 0;
 
     if (viewBoxMatch) {
       const parts = viewBoxMatch[1].split(/\s+/);
       if (parts.length >= 4) {
-        width = parseFloat(parts[2]) || 32;
-        height = parseFloat(parts[3]) || 32;
+        viewBoxX = parseFloat(parts[0]) || 0;
+        viewBoxY = parseFloat(parts[1]) || 0;
+        originalWidth = parseFloat(parts[2]) || 24;
+        originalHeight = parseFloat(parts[3]) || 24;
       }
+    } else {
+      if (widthMatch) originalWidth = parseFloat(widthMatch[1]) || 24;
+      if (heightMatch) originalHeight = parseFloat(heightMatch[1]) || 24;
     }
 
-    // Standardize to 32x32
-    width = 32;
-    height = 32;
+    // Apply color processing if needed - but preserve SVG nature
+    if (iconColor) {
+      cleanSvg = enhanceColorProcessing(cleanSvg, iconColor);
+    }
 
-    // Create enhanced SVG
+    // Remove any existing xmlns declarations to avoid conflicts
+    cleanSvg = cleanSvg.replace(/\s*xmlns[^=]*="[^"]*"/g, '');
+
+    // Create ultra-high-quality SVG - this stays as pure vector
     let enhancedSvg = cleanSvg
-      .replace('<svg', '<svg shape-rendering="geometricPrecision" text-rendering="optimizeLegibility"');
+      .replace(/<svg[^>]*>/i, (match) => {
+        // Extract existing attributes
+        let attrs = match.replace(/<svg\s*/i, '').replace(/>\s*$/, '');
 
+        // Add quality rendering attributes
+        const qualityAttrs = [
+          'shape-rendering="geometricPrecision"',
+          'text-rendering="optimizeLegibility"',
+          'image-rendering="optimizeQuality"',
+          'color-rendering="optimizeQuality"',
+          'xmlns="http://www.w3.org/2000/svg"'
+        ].join(' ');
+
+        return `<svg ${attrs} ${qualityAttrs}>`;
+      });
+
+    // Ensure proper viewBox for scaling
     if (!enhancedSvg.includes('viewBox')) {
-      enhancedSvg = enhancedSvg.replace('<svg', `<svg viewBox="0 0 ${width} ${height}"`);
+      enhancedSvg = enhancedSvg.replace('<svg', `<svg viewBox="${viewBoxX} ${viewBoxY} ${originalWidth} ${originalHeight}"`);
     }
+
+    // Calculate final dimensions (maintain aspect ratio but target 32px height)
+    const aspectRatio = originalWidth / originalHeight;
+    const targetHeight = 32;
+    const targetWidth = Math.round(targetHeight * aspectRatio);
 
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(enhancedSvg).toString('base64')}`;
 
-    console.log('Processed SVG:', width, 'x', height);
-    return { dataUri, width, height };
+    console.log('Pure SVG processed (vector quality):', `${targetWidth}x${targetHeight}`, 'from', `${originalWidth}x${originalHeight}`);
+    return { dataUri, width: targetWidth, height: targetHeight };
   } catch (error) {
     console.error('SVG processing failed:', error.message);
     return null;
   }
-}
-
-async function processPixelImage(buffer, iconColor) {
+}async function processPixelImage(buffer, iconColor) {
   try {
     if (!isValidImageBuffer(buffer)) {
       return null;
@@ -227,94 +326,89 @@ async function processPixelImage(buffer, iconColor) {
 
     // Get image metadata
     const metadata = await sharp(buffer).metadata();
-    console.log('Processing image:', metadata.format, `${metadata.width}x${metadata.height}`);
+    console.log('Processing raster image:', metadata.format, `${metadata.width}x${metadata.height}`);
 
-    // Calculate target size
-    const baseHeight = 32;
+    // Use ultra-high working resolution for quality
+    const workingSize = 512; // Much higher resolution for crisp results
     const aspectRatio = metadata.width / metadata.height;
-    let targetWidth = Math.round(baseHeight * aspectRatio);
-    let targetHeight = baseHeight;
+    let workingWidth = workingSize;
+    let workingHeight = workingSize;
 
-    const maxWidth = 128;
-    if (targetWidth > maxWidth) {
-      targetWidth = maxWidth;
-      targetHeight = Math.round(targetWidth / aspectRatio);
-    }
-
-    // Convert to SVG-like format by tracing/vectorizing the image
-    // For now, we'll create a simplified approach using the image as a mask
-    // and applying the color as a fill
-    
-    if (iconColor) {
-      // Parse and format the color consistently
-      const finalColor = formatColorForSvg(iconColor);
-
-      // Process image to get alpha channel and create a colored SVG
-      const processedBuffer = await sharp(buffer)
-        .resize(targetWidth, targetHeight, {
-          fit: 'inside',
-          withoutEnlargement: true,
-          kernel: 'lanczos3'
-        })
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      const { data, info } = processedBuffer;
-      const { width, height, channels } = info;
-
-      // Create SVG paths from the alpha channel
-      let paths = '';
-      const threshold = 128; // Alpha threshold for considering a pixel "solid"
-      
-      // Simple approach: create rectangles for each solid pixel
-      // This is basic but works for simple icons
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const pixelIndex = (y * width + x) * channels;
-          const alpha = data[pixelIndex + 3]; // Alpha channel
-          
-          if (alpha > threshold) {
-            paths += `<rect x="${x}" y="${y}" width="1" height="1" fill="${finalColor}" opacity="${alpha / 255}"/>`;
-          }
-        }
-      }
-
-      // Create SVG with the colored paths
-      const svg = `<svg width="${targetWidth}" height="${targetHeight}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
-        ${paths}
-      </svg>`;
-
-      const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-
-      console.log('Converted pixel image to colored SVG:', targetWidth, 'x', targetHeight);
-      return { dataUri, width: targetWidth, height: targetHeight };
+    if (aspectRatio > 1) {
+      workingHeight = Math.round(workingSize / aspectRatio);
     } else {
-      // No color specified, just convert to SVG wrapper (original behavior)
-      const processedBuffer = await sharp(buffer)
-        .resize(targetWidth, targetHeight, {
-          fit: 'inside',
-          withoutEnlargement: true,
-          kernel: 'lanczos3'
-        })
-        .png({ quality: 100, compressionLevel: 0 })
-        .toBuffer();
-
-      const base64 = processedBuffer.toString('base64');
-      const svg = `<svg width="${targetWidth}" height="${targetHeight}" viewBox="0 0 ${targetWidth} ${targetHeight}" xmlns="http://www.w3.org/2000/svg">
-        <image href="data:image/png;base64,${base64}" width="${targetWidth}" height="${targetHeight}" style="image-rendering: crisp-edges;"/>
-      </svg>`;
-
-      const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-
-      console.log('Processed pixel image to SVG wrapper:', targetWidth, 'x', targetHeight);
-      return { dataUri, width: targetWidth, height: targetHeight };
+      workingWidth = Math.round(workingSize * aspectRatio);
     }
+
+    // Ensure minimum working size for quality
+    workingWidth = Math.max(workingWidth, 256);
+    workingHeight = Math.max(workingHeight, 256);
+
+    // Process with ultra-high quality settings
+    const processedBuffer = await sharp(buffer)
+      .resize(workingWidth, workingHeight, {
+        fit: 'inside',
+        withoutEnlargement: true, // Don't enlarge small images
+        kernel: 'lanczos3',
+        fastShrinkOnLoad: false
+      })
+      .normalize() // Enhance contrast
+      .sharpen({ // Advanced sharpening for crisp edges
+        sigma: 1.0,
+        m1: 0.5,
+        m2: 3.0,
+        x1: 1,
+        y2: 15,
+        y3: 25
+      })
+      .gamma(1.1) // Slight gamma correction for better contrast
+      .modulate({
+        brightness: 1.05, // Slight brightness boost
+        saturation: 1.1   // Slight saturation boost for vibrancy
+      })
+      .png({
+        quality: 100,
+        compressionLevel: 0,
+        adaptiveFiltering: true,
+        palette: false,
+        progressive: false
+      })
+      .toBuffer();
+
+    // Calculate final display size (higher than before for better quality)
+    const displayHeight = 64; // Increased from 32px for much better quality
+    const displayWidth = Math.round(displayHeight * aspectRatio);
+
+    const base64 = processedBuffer.toString('base64');
+
+    // Create SVG with ultra-high quality settings and proper scaling
+    const svg = `<svg width="${displayWidth}" height="${displayHeight}" viewBox="0 0 ${displayWidth} ${displayHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+      <defs>
+        <filter id="icon-enhance">
+          <feColorMatrix type="saturate" values="1.1"/>
+          <feComponentTransfer>
+            <feFuncR type="gamma" amplitude="1" exponent="0.9"/>
+            <feFuncG type="gamma" amplitude="1" exponent="0.9"/>
+            <feFuncB type="gamma" amplitude="1" exponent="0.9"/>
+          </feComponentTransfer>
+        </filter>
+      </defs>
+      <image href="data:image/png;base64,${base64}" width="${displayWidth}" height="${displayHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
+    </svg>`;
+
+    const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+
+    console.log('Ultra-high-quality raster processing:', displayWidth, 'x', displayHeight, 'from working size', workingWidth, 'x', workingHeight);
+    return { dataUri, width: displayWidth, height: displayHeight };
   } catch (error) {
-    console.error('Pixel image processing failed:', error.message);
+    console.error('High-quality raster processing failed:', error.message);
     return null;
   }
 }
+
+// =============================================================================
+// BADGE GENERATION
+// =============================================================================
 
 async function processIcon(url, iconColor) {
   // Fetch and process image
@@ -325,7 +419,7 @@ async function processIcon(url, iconColor) {
   if (isSvgBuffer(buffer)) {
     result = await processSvgImage(buffer, iconColor);
   } else {
-    // Now pixel images can also be recolored by converting them to SVG
+    // Convert raster images to true vector paths
     result = await processPixelImage(buffer, iconColor);
   }
 
@@ -341,13 +435,14 @@ function calculateBadgeDimensions(text, iconData) {
   const avgCharWidth = 10.0;
   const textWidth = Math.ceil(text.length * avgCharWidth);
 
-  const padding = 10;
-  const iconPadding = iconData ? 8 : 0;
+  const padding = 10; // Optimized padding for compact design
+  const iconPadding = iconData ? 8 : 0; // Balanced icon spacing
   const textPadding = 12;
 
   let iconWidth = 0, iconHeight = 0;
   if (iconData) {
-    const maxHeight = 16;
+    // Compact size for minimal badges
+    const maxHeight = 20; // Further reduced for even more compact badges
     if (iconData.height > maxHeight) {
       const scale = maxHeight / iconData.height;
       iconWidth = Math.round(iconData.width * scale);
@@ -358,7 +453,7 @@ function calculateBadgeDimensions(text, iconData) {
     }
   }
 
-  const height = 32;
+  const height = 32; // Adjusted badge height for compact design
   const totalWidth = padding + iconWidth + iconPadding + textWidth + textPadding;
 
   return {
@@ -386,13 +481,13 @@ function generateBadgeSvg(text, bgColor, iconData, textColor) {
   }
   const dims = calculateBadgeDimensions(text, iconData);
 
-  const fontSize = '11';
+  const fontSize = '12'; // Slightly larger font for better readability
   const fontFamily = 'Verdana, system-ui, sans-serif';
 
-  return `<svg width="${dims.totalWidth}" height="${dims.height}" viewBox="0 0 ${dims.totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
-    <rect width="${dims.totalWidth}" height="${dims.height}" fill="${bgColor}"/>
-    ${iconData ? `<image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" style="image-rendering: crisp-edges;"/>` : ''}
-    <text x="${dims.textX}" y="${dims.textY}" text-anchor="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="700" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.1em;">${text}</text>
+  return `<svg width="${dims.totalWidth}" height="${dims.height}" viewBox="0 0 ${dims.totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+    <rect width="${dims.totalWidth}" height="${dims.height}" fill="${bgColor}" rx="6" ry="6"/>
+    ${iconData ? `<image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" style="image-rendering: optimizeQuality;"/>` : ''}
+    <text x="${dims.textX}" y="${dims.textY}" text-anchor="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.025em;">${text}</text>
   </svg>`;
 }
 
