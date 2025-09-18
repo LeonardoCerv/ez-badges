@@ -46,17 +46,14 @@ The badge generator includes intelligent text color adjustment based on WCAG con
 # Basic badge
 http://localhost:3000/badge?text=Hello&color=blue
 
-# With website favicon (recommended)
-http://localhost:3000/badge?text=GitHub&website=https://github.com&color=#24292e
-
 # With direct logo URL
 http://localhost:3000/badge?text=Node.js&logo=https://nodejs.org/static/images/logo.svg&color=green
 
 # High quality processing
-http://localhost:3000/badge?text=React&website=https://reactjs.org&logoQuality=ultra
+http://localhost:3000/badge?text=React&logo=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg&logoQuality=ultra
 
 # Custom styling
-http://localhost:3000/badge?text=Vue.js&website=https://vuejs.org&color=#4FC08D&textColor=white
+http://localhost:3000/badge?text=Vue.js&logo=https://vuejs.org/logo.svg&color=#4FC08D&textColor=white
 ```
 
 ## Parameters
@@ -64,7 +61,6 @@ http://localhost:3000/badge?text=Vue.js&website=https://vuejs.org&color=#4FC08D&
 - `text`: Badge text (default: 'Badge')
 - `color`: Background color (default: 'blue')
 - `logo`: URL to external logo image
-- `website`: URL of website to fetch favicon from (takes priority over logo)
 - `textColor`: Text color (default: 'white', auto-adjusted for contrast)
 - `fontFamily`: Font family for text (default: 'Verdana, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif')
 - `autoContrast`: Auto-adjust text color for better contrast (default: 'true')
@@ -86,34 +82,8 @@ Choose the appropriate quality level for your logos:
 /badge?text=Logo&logo=https://example.com/logo.png&logoQuality=high
 
 # Standard quality for faster loading
-# Standard quality for faster loading
 /badge?text=Logo&logo=https://example.com/logo.png&logoQuality=standard
 ```
-
-## Website Favicon Integration
-
-Automatically fetch and display website favicons for crisp, professional badges:
-
-```bash
-# Use website favicon (recommended for websites)
-/badge?text=GitHub&website=https://github.com
-
-# Still supports direct logo URLs
-/badge?text=Node.js&logo=https://nodejs.org/static/images/logo.svg
-
-# Website takes priority over logo
-/badge?text=Test&website=https://example.com&logo=https://example.com/logo.png
-```
-
-### Favicon Sources Checked:
-1. **Standard favicons**: `/favicon.ico`, `/favicon.png`, `/favicon.svg`, `/favicon.webp`
-2. **Apple touch icons**: Multiple sizes from 60x60 to 152x152 pixels
-3. **Android icons**: Chrome Web App icons in various sizes
-4. **Generic icons**: `/icon.png`, `/icon.svg`, `/logo.png`, `/logo.svg`
-5. **Common directories**: `/assets/`, `/static/`, `/images/`, `/img/`
-6. **Web App Manifest**: Parses `manifest.json` for icon definitions
-7. **HTML link tags**: All favicon-related `<link>` elements
-8. **Open Graph images**: Fallback to social media preview images
 
 ## SVG Support
 
@@ -166,10 +136,6 @@ The badge generator now provides enhanced support for SVG logos:
 
 ### Common Issues
 
-**"No favicon found for website"**
-- The website may not have standard favicon locations
-- Try using a direct logo URL instead: `?logo=https://example.com/logo.png`
-
 **"Unsupported image format encountered, attempting alternative processing"**
 - The system automatically tries multiple conversion strategies (JPEG, WebP, TIFF to PNG)
 - If all strategies fail, a clean placeholder is shown instead of breaking the badge
@@ -184,10 +150,6 @@ The badge generator now provides enhanced support for SVG logos:
 - Fixed dimension mismatch between SVG container and image
 - Proper aspect ratio preservation
 - Smart scaling for images that are too large or too small
-
-**"HTML parsing failed"**
-- The website may have anti-bot protection
-- The website may be temporarily unavailable
 
 **"Unsupported image format"**
 - Ensure your image is in a supported format (PNG, JPG, GIF, WebP, SVG)
