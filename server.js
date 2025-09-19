@@ -581,7 +581,7 @@ function calculateBadgeDimensions(text, iconData) {
   };
 }
 
-function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'squared') {
+function generateBadgeSvg(text, bgColor, iconData, textColor) {
   let finalTextColor;
   if (textColor && textColor !== 'auto') {
     // Parse and format the textColor consistently, making it slightly lighter
@@ -599,11 +599,8 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'squared')
   const fontSize = '12'; // Slightly larger font for better readability
   const fontFamily = 'Verdana, system-ui, sans-serif';
 
-  // Determine border radius based on edges parameter
-  const borderRadius = edges === 'rounded' ? '8' : '0';
-
   return `<svg width="${dims.totalWidth}" height="${dims.height}" viewBox="0 0 ${dims.totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
-    <rect width="${dims.totalWidth}" height="${dims.height}" fill="${bgColor}" rx="${borderRadius}" ry="${borderRadius}"/>
+    <rect width="${dims.totalWidth}" height="${dims.height}" fill="${bgColor}" rx="6" ry="6"/>
     ${iconData ? `<image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" style="image-rendering: optimizeQuality;"/>` : ''}
     <text x="${dims.textX}" y="${dims.textY}" text-anchor="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.025em;">${text}</text>
   </svg>`;
@@ -619,8 +616,7 @@ app.get('/badge', async (req, res) => {
     bgColor = 'white',
     icon,
     iconColor,
-    textColor,
-    edges = 'squared'
+    textColor
   } = req.query;
 
   // Parse bgColor to handle both hex and named colors
@@ -638,7 +634,7 @@ app.get('/badge', async (req, res) => {
   }
 
   // Generate SVG badge
-  const svg = generateBadgeSvg(text, finalBgColor, iconData, textColor, edges);
+  const svg = generateBadgeSvg(text, finalBgColor, iconData, textColor);
 
   // Send response
   res.setHeader('Content-Type', 'image/svg+xml');
