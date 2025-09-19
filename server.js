@@ -12,17 +12,59 @@ const port = process.env.PORT || 3000;
 // =============================================================================
 
 const COLORS = {
-  black: { r: 0, g: 0, b: 0 },
-  white: { r: 255, g: 255, b: 255 },
-  red: { r: 255, g: 0, b: 0 },
-  green: { r: 0, g: 128, b: 0 },
-  blue: { r: 0, g: 0, b: 255 },
-  yellow: { r: 255, g: 255, b: 0 },
-  purple: { r: 128, g: 0, b: 128 },
-  orange: { r: 255, g: 165, b: 0 },
-  pink: { r: 255, g: 192, b: 203 },
-  gray: { r: 128, g: 128, b: 128 },
-  grey: { r: 128, g: 128, b: 128 }
+  black:         { r: 0, g: 0, b: 0 },
+  white:         { r: 255, g: 255, b: 255 },
+
+  // Grays & Neutrals
+  grayLight:     { r: 245, g: 245, b: 247 },
+  gray:          { r: 128, g: 128, b: 128 },
+  grayDark:      { r: 64, g: 64, b: 64 },
+  slate:         { r: 112, g: 128, b: 144 },
+  charcoal:      { r: 54, g: 69, b: 79 },
+
+  // Blues
+  blue:          { r: 0, g: 122, b: 255 },
+  lightBlue:     { r: 173, g: 216, b: 230 },
+  skyBlue:       { r: 135, g: 206, b: 235 },
+  teal:          { r: 0, g: 150, b: 136 },
+  cyan:          { r: 0, g: 188, b: 212 },
+
+  // Greens
+  green:         { r: 76, g: 175, b: 80 },
+  mint:          { r: 152, g: 251, b: 152 },
+  seafoam:       { r: 120, g: 219, b: 226 },
+  olive:         { r: 128, g: 128, b: 0 },
+  emerald:       { r: 80, g: 200, b: 120 },
+
+  // Yellows & Oranges
+  yellow:        { r: 255, g: 235, b: 59 },
+  amber:         { r: 255, g: 191, b: 0 },
+  orange:        { r: 255, g: 152, b: 0 },
+  peach:         { r: 255, g: 218, b: 185 },
+  gold:          { r: 255, g: 215, b: 0 },
+
+  // Reds & Pinks
+  red:           { r: 244, g: 67, b: 54 },
+  coral:         { r: 255, g: 127, b: 80 },
+  salmon:        { r: 250, g: 128, b: 114 },
+  pink:          { r: 255, g: 192, b: 203 },
+  rose:          { r: 255, g: 102, b: 102 },
+
+  // Purples
+  purple:        { r: 156, g: 39, b: 176 },
+  lavender:      { r: 230, g: 230, b: 250 },
+  lilac:         { r: 200, g: 162, b: 200 },
+  violet:        { r: 148, g: 0, b: 211 },
+  indigo:        { r: 75, g: 0, b: 130 },
+
+  // Modern "Soft" Tones
+  sand:          { r: 244, g: 236, b: 219 },
+  beige:         { r: 245, g: 245, b: 220 },
+  ivory:         { r: 255, g: 255, b: 240 },
+  blush:         { r: 222, g: 93, b: 131 },
+  sage:          { r: 188, g: 184, b: 138 },
+  dustyBlue:     { r: 96, g: 147, b: 172 },
+  terracotta:    { r: 204, g: 78, b: 92 }
 };
 
 function parseColor(color) {

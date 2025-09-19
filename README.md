@@ -1,177 +1,183 @@
 # EZ Badges
 
-A simple dynamic SVG badge generator with support for external logos.
+A modern, dynamic SVG badge generator with perfect GitHub README integration. Generate beautiful, scalable badges with custom text, colors, icons, and edge styles.
 
-## Features
+[![Node.js Badge](https://badges.0xleo.dev/badge?text=Node.js&bgColor=green&icon=https://nodejs.org/static/images/logo.svg)](https://badges.0xleo.dev)
+[![React Badge](https://badges.0xleo.dev/badge?text=React&bgColor=blue&icon=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg)](https://badges.0xleo.dev)
+[![TypeScript Badge](https://badges.0xleo.dev/badge?text=TypeScript&bgColor=blue&edges=pill)](https://badges.0xleo.dev)
 
-- Generate clean, minimal SVG badges with custom text and colors
-- Embed external logos (SVG sanitized, pixel formats converted to SVG for quality)
-- Simple, flat design without shadows or effects
-- In-memory LRU cache for performance
-- Rate limiting to prevent abuse
-- Fallback handling for failed logo processing
-- **SVG Support**: Direct SVG logos with sanitization, pixel images converted to SVG
+## ✨ Features
 
-## Usage
+- **Dynamic Width**: Automatically adjusts badge width based on content
+- **Customizable Edges**: Rounded, square, or pill-shaped badges
+- **Icon Support**: High-quality SVG and pixel image processing
+- **Perfect GitHub Integration**: Works flawlessly in README files
+- **Smart Colors**: Automatic text contrast optimization
+- **High Performance**: Optimized SVG generation with caching
+- **Secure**: SVG sanitization and rate limiting
 
-Start the server:
+## 🚀 Quick Start
+
+Visit [https://badges.0xleo.dev](https://badges.0xleo.dev) to explore the interactive badge builder and see all available options and examples.
+
+For local development, see the [Development](#-development) section below.
+
+## �️ Development
+
+### Prerequisites
+
+- Node.js 16+
+- npm or yarn
+
+### Local Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/LeonardoCerv/ez-badges.git
+cd ez-badges
+
+# Install dependencies
 npm install
+
+# Start development server
 npm start
+
+# Server will be available at http://localhost:3000
 ```
 
-Access the landing page at `http://localhost:3000`
+### Project Structure
 
-Generate a badge: `http://localhost:3000/badge?text=Hello&color=blue&logo=https://example.com/logo.png&textColor=white`
-
-Embed in Markdown:
-
-```markdown
-![Badge](http://localhost:3000/badge?text=Status&color=#6366f1&logo=https://example.com/logo.png&textColor=white)
+```
+ez-badges/
+├── server.js          # Main application server
+├── index.html         # Landing page with interactive builder
+├── terms.html         # Terms of use page
+├── package.json       # Dependencies and scripts
+└── README.md          # This file
 ```
 
-## Auto Contrast Feature
+### API Endpoints
 
-The badge generator includes intelligent text color adjustment based on WCAG contrast guidelines:
+- `GET /` - Landing page with interactive badge builder
+- `GET /badge` - Generate badge (see web interface for parameters)
+- `GET /terms` - Terms of use
 
-- **Automatic Mode** (`autoContrast=true`): Analyzes background color and chooses white or black text for optimal readability
-- **Manual Mode** (`autoContrast=false`): Uses your specified `textColor`
-- **WCAG Compliant**: Ensures contrast ratio ≥ 4.5:1 for accessibility
-- **Smart Fallback**: If your chosen text color already has good contrast, it keeps your preference
+## 🤝 Contributing
 
-### Examples
+We welcome contributions! EZ Badges is an open-source project and we appreciate help from developers of all skill levels.
 
+### Ways to Contribute
+
+#### Code Contributions
+- **Bug Fixes**: Found a bug? Fix it and submit a PR!
+- **New Features**: Have an idea for a new badge style or functionality?
+- **Performance Improvements**: Help optimize the badge generation process
+- **Security Enhancements**: Improve sanitization or add security features
+
+#### Feature Ideas
+We're always looking for new badge styles and features! Some ideas:
+- New edge styles (curved, wavy, or custom border styles)
+- Gradient backgrounds
+- Animated badges
+- Badge templates for common use cases
+- Internationalization support
+- Responsive badges
+- Special effects (glow, shadow, etc.)
+- API improvements for programmatic access
+
+#### Documentation
+- Improve examples and tutorials
+- Add more use cases and real-world examples
+- Translate documentation to other languages
+- Create video tutorials or blog posts
+
+### How to Contribute
+
+#### 1. Fork & Clone
 ```bash
-# Basic badge
-http://localhost:3000/badge?text=Hello&color=blue
-
-# With direct logo URL
-http://localhost:3000/badge?text=Node.js&logo=https://nodejs.org/static/images/logo.svg&color=green
-
-# High quality processing
-http://localhost:3000/badge?text=React&logo=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg&logoQuality=ultra
-
-# Custom styling
-http://localhost:3000/badge?text=Vue.js&logo=https://vuejs.org/logo.svg&color=#4FC08D&textColor=white
+git clone https://github.com/LeonardoCerv/ez-badges.git
+cd ez-badges
+npm install
 ```
 
-## Parameters
-
-- `text`: Badge text (default: 'Badge')
-- `color`: Background color (default: 'blue')
-- `logo`: URL to external logo image
-- `textColor`: Text color (default: 'white', auto-adjusted for contrast)
-- `fontFamily`: Font family for text (default: 'Verdana, system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif')
-- `autoContrast`: Auto-adjust text color for better contrast (default: 'true')
-- `logoQuality`: Logo processing quality - 'ultra', 'high', or 'standard' (default: 'high')
-
-## Logo Quality Options
-
-Choose the appropriate quality level for your logos:
-
-- **ultra**: Maximum quality (48px height, no compression) - Best for high-resolution logos
-- **high**: Excellent quality (32px height, minimal compression) - Default, great balance
-- **standard**: Good quality (24px height, balanced compression) - Smaller file sizes
-
+#### 2. Create a Feature Branch
 ```bash
-# Ultra quality for high-res logos
-/badge?text=Logo&logo=https://example.com/high-res.png&logoQuality=ultra
-
-# High quality (default)
-/badge?text=Logo&logo=https://example.com/logo.png&logoQuality=high
-
-# Standard quality for faster loading
-/badge?text=Logo&logo=https://example.com/logo.png&logoQuality=standard
+git checkout -b feature/your-awesome-feature
+# or
+git checkout -b fix/issue-description
 ```
 
-## SVG Support
+#### 3. Make Your Changes
+- Follow the existing code style
+- Add tests for new features
+- Update documentation if needed
+- Test your changes thoroughly
 
-The badge generator now provides enhanced support for SVG logos:
-
-### Direct SVG Logos
+#### 4. Test Your Changes
 ```bash
-/badge?text=React&logo=https://reactjs.org/logo.svg
+npm start
+# Visit http://localhost:3000 to test your changes
 ```
 
-**Features:**
-- Automatic SVG detection by content-type, file extension, or content analysis
-- Sanitization using DOMPurify to prevent XSS attacks
-- Preserves original SVG quality and scalability
-- Extracts dimensions from viewBox for proper sizing
+#### 5. Submit a Pull Request
+1. Push your branch to your fork
+2. Create a Pull Request on GitHub
+3. Describe your changes clearly
+4. Reference any related issues
 
-### Pixel to SVG Conversion
-```bash
-/badge?text=Node.js&logo=https://nodejs.org/logo.png
-```
+### Development Guidelines
 
-**Benefits:**
-- Pixel images (PNG, JPG, GIF) are converted to SVG format
-- Maintains high quality through optimized PNG processing
-- Embeds processed image in SVG wrapper for scalability
-- Better integration with SVG badge output
+#### Code Style
+- Use consistent indentation (2 spaces)
+- Follow JavaScript/Node.js best practices
+- Add comments for complex logic
+- Keep functions small and focused
 
-### Quality Preservation
-- **SVG logos**: No quality loss, fully scalable vector graphics
-- **Pixel logos**: Maximum quality PNG processing with zero compression
-- **Smart resizing**: Only resizes when necessary, preserves original quality when possible
-- **SVG embedding**: All pixel images converted to SVG format for consistent output
-- **Fallback handling**: Unsupported formats get converted through multiple strategies (JPEG, WebP, TIFF)
-- **Placeholder fallback**: When all conversion fails, shows a clean placeholder instead of breaking
+#### Testing
+- Test with different badge configurations
+- Verify GitHub README compatibility
+- Check edge cases and error handling
+- Test with various image formats
 
-## Examples
-```
+#### Documentation
+- Update README for new features
+- Add JSDoc comments for new functions
+- Include examples in your PR description
 
-## Styling Features
+### Current Priorities
 
-- **Clean Design**: Simple, minimal badges without shadows or effects
-- **Modern Typography**: Uses Verdana font with system font fallbacks
-- **Solid Colors**: Clean, flat color backgrounds
-- **Squared Edges**: Sharp, clean rectangular badges
-- **Auto Contrast**: Automatically adjusts text color (white/black) for optimal readability
-- **High-Quality Logos**: Advanced PNG processing with Lanczos3 resampling, adaptive filtering, and optimized compression
-- **Responsive Layout**: Dynamic width based on content
+We're particularly interested in contributions for:
+- Performance optimizations for faster badge generation
+- New badge styles and customization options
+- Better error handling and user feedback
+- Accessibility improvements for screen readers
+- Mobile optimization for smaller screens
 
-## Troubleshooting
+### Getting Help
 
-### Common Issues
+- **Issues**: [Report bugs or request features](https://github.com/LeonardoCerv/ez-badges/issues)
+- **Discussions**: [Share ideas and get feedback](https://github.com/LeonardoCerv/ez-badges/discussions)
 
-**"Unsupported image format encountered, attempting alternative processing"**
-- The system automatically tries multiple conversion strategies (JPEG, WebP, TIFF to PNG)
-- If all strategies fail, a clean placeholder is shown instead of breaking the badge
-- This ensures badges always render properly even with problematic images
+### Recognition
 
-**"Error converting pixel to SVG"**
-- The image format may not be supported (try PNG, JPG, or WebP)
-- The image may be corrupted or too large (>2MB)
-- Automatic fallback to placeholder prevents badge failure
+All contributors will be:
+- Listed in our contributors file
+- Mentioned in release notes
+- Featured in our documentation
+- Given credit for their awesome work!
 
-**Logo Overflow Issues**
-- Fixed dimension mismatch between SVG container and image
-- Proper aspect ratio preservation
-- Smart scaling for images that are too large or too small
+**Ready to contribute?** Check out our [Issues](https://github.com/LeonardoCerv/ez-badges/issues) page for good first issues, or create your own feature request!
 
-**"Unsupported image format"**
-- Ensure your image is in a supported format (PNG, JPG, GIF, WebP, SVG)
-- Check that the image URL is accessible and returns valid image data
+## 📄 License & Terms
 
-### Supported Image Formats
-- **SVG**: Sanitized and embedded directly
-- **PNG/JPG/WebP**: Converted to high-quality SVG with zero compression
-- **GIF**: Converted to PNG then SVG
+See [Terms of Use](https://badges.0xleo.dev/terms) for detailed usage terms.
 
-### Quality Settings
-- **ultra**: Maximum quality (64px height, no compression)
-- **high**: Excellent quality (48px height, minimal compression) - Default
-- **standard**: Good quality (32px height, balanced compression)
+## 📞 Contact
 
-## Legal
+- **Web Interface**: [https://badges.0xleo.dev](https://badges.0xleo.dev)
+- **GitHub**: [LeonardoCerv/ez-badges](https://github.com/LeonardoCerv/ez-badges)
+- **Issues**: [Report Issues](https://github.com/LeonardoCerv/ez-badges/issues)
 
-See [Terms of Use](/terms). You are responsible for the content you use.
+---
 
-## Future Enhancements
-
-- Redis cache
-- CDN integration
-- Additional formats (PNG badges)
-- More styling options
+**Made with ❤️ by [LeonardoCerv](https://github.com/LeonardoCerv)**
