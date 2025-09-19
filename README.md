@@ -2,77 +2,28 @@
 
 A modern, dynamic SVG badge generator with perfect GitHub README integration. Generate beautiful, scalable badges with custom text, colors, icons, and edge styles.
 
-[![Node.js Badge](https://badges.0xleo.dev/badge?text=Node.js&bgColor=green&icon=https://nodejs.org/static/images/logo.svg)](https://badges.0xleo.dev)
-[![React Badge](https://badges.0xleo.dev/badge?text=React&bgColor=blue&icon=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg)](https://badges.0xleo.dev)
-[![TypeScript Badge](https://badges.0xleo.dev/badge?text=TypeScript&bgColor=blue&edges=pill)](https://badges.0xleo.dev)
+[![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&bgColor=white&textColor=black&icon=https://cdn.iconscout.com/icon/free/png-512/free-javascript-icon-svg-download-png-225993.png?f=webp&w=512)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Node.js](https://badges.0xleo.dev/badge?text=Node.js&bgColor=black&icon=https://nodejs.org/static/images/logo.svg)](https://nodejs.org)
+[![Express](https://badges.0xleo.dev/badge?text=Express&bgColor=white&textColor=black&icon=https://icon.icepanel.io/Technology/png-shadow-512/Express.png)](https://expressjs.com)
+[![Sharp](https://badges.0xleo.dev/badge?text=Sharp&bgColor=black&icon=https://sharp.pixelplumbing.com/_astro/sharp-logo.CiVIswaO.svg)](https://sharp.pixelplumbing.com)
 
-## ✨ Features
-
-- **Dynamic Width**: Automatically adjusts badge width based on content
-- **Customizable Edges**: Rounded, square, or pill-shaped badges
-- **Icon Support**: High-quality SVG and pixel image processing
-- **Perfect GitHub Integration**: Works flawlessly in README files
-- **Smart Colors**: Automatic text contrast optimization
-- **High Performance**: Optimized SVG generation with caching
-- **Secure**: SVG sanitization and rate limiting
-
-## 🚀 Quick Start
+## Quick Start
 
 Visit [https://badges.0xleo.dev](https://badges.0xleo.dev) to explore the interactive badge builder and see all available options and examples.
 
-For local development, see the [Development](#-development) section below.
+For local development, see the Development section below.
 
-## �️ Development
-
-### Prerequisites
-
-- Node.js 16+
-- npm or yarn
-
-### Local Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/LeonardoCerv/ez-badges.git
-cd ez-badges
-
-# Install dependencies
-npm install
-
-# Start development server
-npm start
-
-# Server will be available at http://localhost:3000
-```
-
-### Project Structure
-
-```
-ez-badges/
-├── server.js          # Main application server
-├── index.html         # Landing page with interactive builder
-├── terms.html         # Terms of use page
-├── package.json       # Dependencies and scripts
-└── README.md          # This file
-```
-
-### API Endpoints
-
-- `GET /` - Landing page with interactive badge builder
-- `GET /badge` - Generate badge (see web interface for parameters)
-- `GET /terms` - Terms of use
-
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! EZ Badges is an open-source project and we appreciate help from developers of all skill levels.
 
 ### Ways to Contribute
 
 #### Code Contributions
-- **Bug Fixes**: Found a bug? Fix it and submit a PR!
-- **New Features**: Have an idea for a new badge style or functionality?
-- **Performance Improvements**: Help optimize the badge generation process
-- **Security Enhancements**: Improve sanitization or add security features
+- Bug Fixes: Found a bug? Fix it and submit a PR!
+- New Features: Have an idea for a new badge style or functionality?
+- Performance Improvements: Help optimize the badge generation process
+- Security Enhancements: Improve sanitization or add security features
 
 #### Feature Ideas
 We're always looking for new badge styles and features! Some ideas:
@@ -155,8 +106,8 @@ We're particularly interested in contributions for:
 
 ### Getting Help
 
-- **Issues**: [Report bugs or request features](https://github.com/LeonardoCerv/ez-badges/issues)
-- **Discussions**: [Share ideas and get feedback](https://github.com/LeonardoCerv/ez-badges/discussions)
+- Issues: [Report bugs or request features](https://github.com/LeonardoCerv/ez-badges/issues)
+- Discussions: [Share ideas and get feedback](https://github.com/LeonardoCerv/ez-badges/discussions)
 
 ### Recognition
 
@@ -166,18 +117,14 @@ All contributors will be:
 - Featured in our documentation
 - Given credit for their awesome work!
 
-**Ready to contribute?** Check out our [Issues](https://github.com/LeonardoCerv/ez-badges/issues) page for good first issues, or create your own feature request!
+Ready to contribute? Check out our Issues page for good first issues, or create your own feature request!
 
-## 📄 License & Terms
+## License & Terms
 
-See [Terms of Use](https://badges.0xleo.dev/terms) for detailed usage terms.
+See Terms of Use for detailed usage terms.
 
-## 📞 Contact
+## Contact
 
-- **Web Interface**: [https://badges.0xleo.dev](https://badges.0xleo.dev)
-- **GitHub**: [LeonardoCerv/ez-badges](https://github.com/LeonardoCerv/ez-badges)
-- **Issues**: [Report Issues](https://github.com/LeonardoCerv/ez-badges/issues)
-
----
-
-**Made with ❤️ by [LeonardoCerv](https://github.com/LeonardoCerv)**
+- Web Interface: [https://badges.0xleo.dev](https://badges.0xleo.dev)
+- GitHub: [LeonardoCerv/ez-badges](https://github.com/LeonardoCerv/ez-badges)
+- Issues: [Report Issues](https://github.com/LeonardoCerv/ez-badges/issues)

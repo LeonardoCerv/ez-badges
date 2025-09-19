@@ -397,7 +397,7 @@
       </div>
       <div class="builder-field">
         <label for="textColor">Text Color</label>
-        <input type="text" id="textColor" value="auto" placeholder="auto, white, #333, etc.">
+        <input type="text" id="textColor" value="white" placeholder="auto, white, #333, etc.">
       </div>
     </div>
 
@@ -436,17 +436,6 @@
       <div class="badge-url" id="directURL"></div>
     </div>
   </div>
-
-  <h2>Features</h2>
-
-  <ul>
-    <li><strong>Dynamic Width:</strong> Automatically adjusts badge width based on content</li>
-    <li><strong>Custom Edges:</strong> Choose from rounded, square, or pill-shaped edges</li>
-    <li><strong>Icon Support:</strong> High-quality SVG and pixel image processing</li>
-    <li><strong>GitHub Ready:</strong> Designed for perfect GitHub README integration</li>
-    <li><strong>Smart Colors:</strong> Automatic text contrast optimization</li>
-    <li><strong>Security:</strong> SVG sanitization and rate limiting</li>
-  </ul>
 
   <h2>Parameters</h2>
 
@@ -740,77 +729,62 @@
     </div>
   </div>
 
-  <h2>Practical Examples</h2>
-
-  <div class="example-grid">
-    <div class="example-card">
-      <h4>Technology Stack</h4>
-      <div class="badge-display">
-        <img src="https://badges.0xleo.dev/badge?text=Node.js&bgColor=green&icon=https://nodejs.org/static/images/logo.svg" alt="Node.js">
-        <img src="https://badges.0xleo.dev/badge?text=React&bgColor=#61dafb&icon=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="React">
-        <img src="https://badges.0xleo.dev/badge?text=TypeScript&bgColor=blue&edges=pill" alt="TypeScript">
-      </div>
-      <p>Show your project's technology stack with official logos.</p>
-    </div>
-
-    <div class="example-card">
-      <h4>Project Status</h4>
-      <div class="badge-display">
-        <img src="https://badges.0xleo.dev/badge?text=Build%20Passing&bgColor=green&edges=pill" alt="Build">
-        <img src="https://badges.0xleo.dev/badge?text=v1.2.3&bgColor=blue" alt="Version">
-        <img src="https://badges.0xleo.dev/badge?text=MIT&bgColor=orange" alt="License">
-      </div>
-      <p>Display build status, version numbers, and licensing information.</p>
-    </div>
-
-    <div class="example-card">
-      <h4>Social Links</h4>
-      <div class="badge-display">
-        <img src="https://badges.0xleo.dev/badge?text=GitHub&bgColor=black&textColor=white" alt="GitHub">
-        <img src="https://badges.0xleo.dev/badge?text=Twitter&bgColor=#1da1f2&textColor=white" alt="Twitter">
-        <img src="https://badges.0xleo.dev/badge?text=Discord&bgColor=#5865f2" alt="Discord">
-      </div>
-      <p>Link to your social media profiles and community platforms.</p>
-    </div>
-  </div>
-
   <h2>GitHub README Usage</h2>
 
   <p>Add badges to your README.md file. Toggle between code and preview:</p>
 
   <div class="readme-demo">
     <div class="readme-tabs">
-      <button class="tab-btn active" onclick="switchTab('code')">Code</button>
-      <button class="tab-btn" onclick="switchTab('preview')">Preview</button>
+      <button class="tab-btn" onclick="switchTab('code')">Code</button>
+      <button class="tab-btn active" onclick="switchTab('preview')">Preview</button>
     </div>
 
-    <div id="code-view" class="readme-content">
+    <div id="code-view" class="readme-content" style="display: none;">
       <pre><code># My Awesome Project
 
+## Technology Stack
 [![Node.js](https://badges.0xleo.dev/badge?text=Node.js&bgColor=green&icon=https://nodejs.org/static/images/logo.svg)](https://nodejs.org)
 [![React](https://badges.0xleo.dev/badge?text=React&bgColor=#61dafb&icon=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg)](https://reactjs.org)
 [![TypeScript](https://badges.0xleo.dev/badge?text=TypeScript&bgColor=blue&edges=pill)](https://typescriptlang.org)
 
+## Project Status
 [![Build Status](https://badges.0xleo.dev/badge?text=Build%20Passing&bgColor=green&edges=pill)](https://github.com/your-repo/actions)
 [![Version](https://badges.0xleo.dev/badge?text=v1.2.3&bgColor=blue)](https://github.com/your-repo/releases)
-[![License](https://badges.0xleo.dev/badge?text=MIT&bgColor=orange)](https://github.com/your-repo/blob/main/LICENSE)</code></pre>
+[![License](https://badges.0xleo.dev/badge?text=MIT&bgColor=orange)](https://github.com/your-repo/blob/main/LICENSE)
+
+## Social Links
+[![GitHub](https://badges.0xleo.dev/badge?text=GitHub&bgColor=black&textColor=white)](https://github.com/your-repo)
+[![Twitter](https://badges.0xleo.dev/badge?text=Twitter&bgColor=#1da1f2&textColor=white)](https://twitter.com/your-repo)
+[![Discord](https://badges.0xleo.dev/badge?text=Discord&bgColor=#5865f2)](https://discord.gg/your-server)</code></pre>
     </div>
 
-    <div id="preview-view" class="readme-content" style="display: none;">
+    <div id="preview-view" class="readme-content">
       <div class="readme-preview">
         <h1>My Awesome Project</h1>
 
+        <h2>Technology Stack</h2>
         <div class="badge-row">
           <img src="https://badges.0xleo.dev/badge?text=Node.js&bgColor=green&icon=https://nodejs.org/static/images/logo.svg" alt="Node.js">
           <img src="https://badges.0xleo.dev/badge?text=React&bgColor=#61dafb&icon=https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="React">
           <img src="https://badges.0xleo.dev/badge?text=TypeScript&bgColor=blue&edges=pill" alt="TypeScript">
         </div>
+        <p>Show your project's technology stack with official logos.</p>
 
+        <h2>Project Status</h2>
         <div class="badge-row">
           <img src="https://badges.0xleo.dev/badge?text=Build%20Passing&bgColor=green&edges=pill" alt="Build Status">
           <img src="https://badges.0xleo.dev/badge?text=v1.2.3&bgColor=blue" alt="Version">
           <img src="https://badges.0xleo.dev/badge?text=MIT&bgColor=orange" alt="License">
         </div>
+        <p>Display build status, version numbers, and licensing information.</p>
+
+        <h2>Social Links</h2>
+        <div class="badge-row">
+          <img src="https://badges.0xleo.dev/badge?text=GitHub&bgColor=black&textColor=white" alt="GitHub">
+          <img src="https://badges.0xleo.dev/badge?text=Twitter&bgColor=#1da1f2&textColor=white" alt="Twitter">
+          <img src="https://badges.0xleo.dev/badge?text=Discord&bgColor=#5865f2" alt="Discord">
+        </div>
+        <p>Link to your social media profiles and community platforms.</p>
       </div>
     </div>
   </div>
@@ -830,7 +804,7 @@
     function generateBadge() {
       const text = encodeURIComponent(document.getElementById('text').value || 'Badge');
       const bgColor = encodeURIComponent(document.getElementById('bgColor').value || 'white');
-      const textColor = encodeURIComponent(document.getElementById('textColor').value || 'auto');
+      const textColor = encodeURIComponent(document.getElementById('textColor').value || 'white');
       const icon = document.getElementById('icon').value;
       const iconColor = document.getElementById('iconColor').value;
       const edges = document.getElementById('edges').value;
@@ -873,7 +847,7 @@
     function resetForm() {
       document.getElementById('text').value = 'Hello World';
       document.getElementById('bgColor').value = 'blue';
-      document.getElementById('textColor').value = 'auto';
+      document.getElementById('textColor').value = 'white';
       document.getElementById('icon').value = '';
       document.getElementById('iconColor').value = '';
       document.getElementById('edges').value = 'rounded';
