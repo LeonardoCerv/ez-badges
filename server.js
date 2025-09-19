@@ -700,11 +700,11 @@ app.get('/badge', async (req, res) => {
 
   // Parse bgColor to handle both hex and named colors
   const parsedBgColor = parseColor(bgColor);
-  // Make the background color more vibrant with brightness and saturation boost
-  const vibrantR = Math.min(255, Math.round(parsedBgColor.r * 1.3));
-  const vibrantG = Math.min(255, Math.round(parsedBgColor.g * 1.3));
-  const vibrantB = Math.min(255, Math.round(parsedBgColor.b * 1.3));
-  const finalBgColor = `rgb(${vibrantR}, ${vibrantG}, ${vibrantB})`;
+  // Make the background color lighter and more subtle
+  const lighterR = Math.min(255, Math.round(parsedBgColor.r * 1.15 + 20));
+  const lighterG = Math.min(255, Math.round(parsedBgColor.g * 1.15 + 20));
+  const lighterB = Math.min(255, Math.round(parsedBgColor.b * 1.15 + 20));
+  const finalBgColor = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
 
   // Process icon if provided
   let iconData = null;
