@@ -669,7 +669,7 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded')
     const lighterB = Math.min(255, Math.round(parsedColor.b * 1.4));
     finalTextColor = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
   } else {
-    finalTextColor = getBestTextColor(bgColor);
+    finalTextColor = 'rgb(255, 255, 255)'; // Default to white text
   }
 
   const dims = calculateBadgeDimensions(text, iconData);
