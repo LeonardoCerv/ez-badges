@@ -79,7 +79,14 @@ function getBestTextColor(backgroundColor) {
   const whiteContrast = getContrastRatio(backgroundColor, 'white');
   const blackContrast = getContrastRatio(backgroundColor, 'black');
 
-  return whiteContrast > blackContrast ? 'white' : 'black';
+  const baseColor = whiteContrast > blackContrast ? 'white' : 'black';
+  
+  // Make the text color slightly lighter for better vibrancy
+  if (baseColor === 'white') {
+    return 'rgb(255, 255, 255)'; // Pure white
+  } else {
+    return 'rgb(180, 180, 180)'; // Even lighter gray
+  }
 }
 
 function isHexColor(color) {
@@ -102,10 +109,82 @@ function enhanceColorProcessing(svgString, targetColor) {
   if (!targetColor) return svgString;
 
   const finalColor = formatColorForSvg(targetColor);
+  const rgb = parseColor(targetColor);
 
   // Simple and reliable color replacement - focus on main fill attributes
   let enhanced = svgString;
 
+  // Check if this is a pixel image embedded in SVG (contains <image> tag)
+  if (enhanced.includes('<image')) {
+    // For pixel images, use a more vibrant colorization approach
+    const vibrantFilter = `
+        <filter id="vibrant-colorize">
+          <feComponentTransfer>
+            <feFuncR type="linear" slope="1.3" intercept="0"/>
+            <feFuncG type="linear" slope="1.3" intercept="0"/>
+            <feFuncB type="linear" slope="1.3" intercept="0"/>
+          </feComponentTransfer>
+          <feColorMatrix type="saturate" values="0"/>
+          <feColorMatrix type="matrix" values="0 0 0 0 ${rgb.r/255}
+                                               0 0 0 0 ${rgb.g/255}
+                                               0 0 0 0 ${rgb.b/255}
+                                               0 0 0 1 0"/>
+          <feComponentTransfer>
+            <feFuncR type="gamma" amplitude="1" exponent="1.4"/>
+            <feFuncG type="gamma" amplitude="1" exponent="1.4"/>
+            <feFuncB type="gamma" amplitude="1" exponent="1.4"/>
+          </feComponentTransfer>
+          <feColorMatrix type="saturate" values="1.5"/>
+        </filter>`;
+    
+    // Add the filter to defs section
+    enhanced = enhanced.replace('<defs>', `<defs>${vibrantFilter}`);
+    
+    // Apply the filter to the image element
+    enhanced = enhanced.replace(/<image([^>]*?)\/>/g, (match, attrs) => {
+      // Check if filter is already applied
+      if (attrs.includes('filter=')) {
+        return match.replace(/filter="[^"]*"/, `filter="url(#vibrant-colorize)"`);
+      } else {
+        return `<image${attrs} filter="url(#vibrant-colorize)"/>`;
+      }
+    });
+    
+    return enhanced;
+  }
+
+  // For pure SVG content, enhance colors to be more vibrant
+  // First, add a brightness/saturation filter to the defs
+  const vibrantSvgFilter = `
+      <filter id="svg-vibrant">
+        <feComponentTransfer>
+          <feFuncR type="linear" slope="1.2" intercept="0"/>
+          <feFuncG type="linear" slope="1.2" intercept="0"/>
+          <feFuncB type="linear" slope="1.2" intercept="0"/>
+        </feComponentTransfer>
+        <feColorMatrix type="saturate" values="1.8"/>
+        <feComponentTransfer>
+          <feFuncR type="gamma" amplitude="1" exponent="1.3"/>
+          <feFuncG type="gamma" amplitude="1" exponent="1.3"/>
+          <feFuncB type="gamma" amplitude="1" exponent="1.3"/>
+        </feComponentTransfer>
+      </filter>`;
+  
+  // Add the filter to defs section if it exists, otherwise create it
+  if (enhanced.includes('<defs>')) {
+    enhanced = enhanced.replace('<defs>', `<defs>${vibrantSvgFilter}`);
+  } else {
+    enhanced = enhanced.replace('<svg', `<svg><defs>${vibrantSvgFilter}</defs>`);
+  }
+  
+  // Apply the filter to the main SVG element
+  enhanced = enhanced.replace(/<svg([^>]*?)>/, (match, attrs) => {
+    if (attrs.includes('filter=')) {
+      return match.replace(/filter="[^"]*"/, `filter="url(#svg-vibrant)"`);
+    } else {
+      return `<svg${attrs} filter="url(#svg-vibrant)">`;
+    }
+  });
   // Replace fill attributes - be more conservative
   enhanced = enhanced.replace(/fill="([^"]*)"/gi, (match, value) => {
     const normalizedValue = value.trim().toLowerCase();
@@ -131,6 +210,32 @@ function enhanceColorProcessing(svgString, targetColor) {
       return match;
     }
     return `stroke="${finalColor}"`;
+  });
+
+  // Replace fill in style attributes
+  enhanced = enhanced.replace(/style="([^"]*?)fill:\s*([^;"]+)([^"]*?)"/gi, (match, before, color, after) => {
+    const normalizedColor = color.trim().toLowerCase();
+    if (normalizedColor === 'none' ||
+        normalizedColor === 'transparent' ||
+        normalizedColor === 'currentcolor' ||
+        normalizedColor.startsWith('url(') ||
+        normalizedColor.includes('gradient')) {
+      return match;
+    }
+    return `style="${before}fill: ${finalColor}${after}"`;
+  });
+
+  // Replace stroke in style attributes
+  enhanced = enhanced.replace(/style="([^"]*?)stroke:\s*([^;"]+)([^"]*?)"/gi, (match, before, color, after) => {
+    const normalizedColor = color.trim().toLowerCase();
+    if (normalizedColor === 'none' ||
+        normalizedColor === 'transparent' ||
+        normalizedColor === 'currentcolor' ||
+        normalizedColor.startsWith('url(') ||
+        normalizedColor.includes('gradient')) {
+      return match;
+    }
+    return `style="${before}stroke: ${finalColor}${after}"`;
   });
 
   return enhanced;
@@ -382,7 +487,7 @@ async function processSvgImage(buffer, iconColor) {
     const base64 = processedBuffer.toString('base64');
 
     // Create SVG with ultra-high quality settings and proper scaling
-    const svg = `<svg width="${displayWidth}" height="${displayHeight}" viewBox="0 0 ${displayWidth} ${displayHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+    let svg = `<svg width="${displayWidth}" height="${displayHeight}" viewBox="0 0 ${displayWidth} ${displayHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
       <defs>
         <filter id="icon-enhance">
           <feColorMatrix type="saturate" values="1.1"/>
@@ -395,6 +500,11 @@ async function processSvgImage(buffer, iconColor) {
       </defs>
       <image href="data:image/png;base64,${base64}" width="${displayWidth}" height="${displayHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
     </svg>`;
+
+    // Apply color processing to the final SVG if iconColor is specified
+    if (iconColor) {
+      svg = enhanceColorProcessing(svg, iconColor);
+    }
 
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 
@@ -471,11 +581,16 @@ function calculateBadgeDimensions(text, iconData) {
   };
 }
 
-function generateBadgeSvg(text, bgColor, iconData, textColor) {
+function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'squared') {
   let finalTextColor;
   if (textColor && textColor !== 'auto') {
-    // Parse and format the textColor consistently
-    finalTextColor = formatColorForSvg(textColor);
+    // Parse and format the textColor consistently, making it slightly lighter
+    const parsedColor = parseColor(textColor);
+    // Make the color 40% lighter for better vibrancy
+    const lighterR = Math.min(255, Math.round(parsedColor.r * 1.4));
+    const lighterG = Math.min(255, Math.round(parsedColor.g * 1.4));
+    const lighterB = Math.min(255, Math.round(parsedColor.b * 1.4));
+    finalTextColor = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
   } else {
     finalTextColor = getBestTextColor(bgColor);
   }
@@ -484,8 +599,11 @@ function generateBadgeSvg(text, bgColor, iconData, textColor) {
   const fontSize = '12'; // Slightly larger font for better readability
   const fontFamily = 'Verdana, system-ui, sans-serif';
 
+  // Determine border radius based on edges parameter
+  const borderRadius = edges === 'rounded' ? '8' : '0';
+
   return `<svg width="${dims.totalWidth}" height="${dims.height}" viewBox="0 0 ${dims.totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
-    <rect width="${dims.totalWidth}" height="${dims.height}" fill="${bgColor}" rx="6" ry="6"/>
+    <rect width="${dims.totalWidth}" height="${dims.height}" fill="${bgColor}" rx="${borderRadius}" ry="${borderRadius}"/>
     ${iconData ? `<image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" style="image-rendering: optimizeQuality;"/>` : ''}
     <text x="${dims.textX}" y="${dims.textY}" text-anchor="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.025em;">${text}</text>
   </svg>`;
@@ -501,11 +619,17 @@ app.get('/badge', async (req, res) => {
     bgColor = 'white',
     icon,
     iconColor,
-    textColor
+    textColor,
+    edges = 'squared'
   } = req.query;
 
   // Parse bgColor to handle both hex and named colors
-  const finalBgColor = formatColorForSvg(bgColor);
+  const parsedBgColor = parseColor(bgColor);
+  // Make the background color more vibrant with brightness and saturation boost
+  const vibrantR = Math.min(255, Math.round(parsedBgColor.r * 1.3));
+  const vibrantG = Math.min(255, Math.round(parsedBgColor.g * 1.3));
+  const vibrantB = Math.min(255, Math.round(parsedBgColor.b * 1.3));
+  const finalBgColor = `rgb(${vibrantR}, ${vibrantG}, ${vibrantB})`;
 
   // Process icon if provided
   let iconData = null;
@@ -514,7 +638,7 @@ app.get('/badge', async (req, res) => {
   }
 
   // Generate SVG badge
-  const svg = generateBadgeSvg(text, finalBgColor, iconData, textColor);
+  const svg = generateBadgeSvg(text, finalBgColor, iconData, textColor, edges);
 
   // Send response
   res.setHeader('Content-Type', 'image/svg+xml');
