@@ -575,6 +575,47 @@ function calculateBadgeDimensions(text, iconData) {
   };
 }
 
+function calculateTextWidth(text, fontSize = 12, fontFamily = 'Verdana') {
+  // More accurate text width calculation using character-specific widths for Verdana 12px font-weight 600
+  const charWidths = {
+    // Narrow characters
+    'i': 4, 'l': 4, 'j': 4.5, 't': 5, 'f': 5.5, 'r': 6,
+    // Medium characters
+    'a': 7, 'c': 7, 'e': 7, 'n': 7.5, 'o': 7.5, 's': 7, 'u': 7.5, 'v': 7, 'x': 7, 'z': 7,
+    'b': 7.5, 'd': 7.5, 'g': 7.5, 'h': 7.5, 'k': 7.5, 'p': 7.5, 'q': 7.5, 'y': 7,
+    // Wide characters
+    'm': 11, 'w': 11,
+    // Numbers (generally consistent width)
+    '0': 7.5, '1': 5, '2': 7.5, '3': 7.5, '4': 7.5, '5': 7.5, '6': 7.5, '7': 7.5, '8': 7.5, '9': 7.5,
+    // Special characters
+    ' ': 4, '.': 4, ',': 4, ':': 4, ';': 4, '!': 4.5, '?': 7.5, '-': 5, '_': 7.5,
+    '(': 5, ')': 5, '[': 5, ']': 5, '{': 5.5, '}': 5.5, '/': 5.5, '\\': 5.5, '|': 4,
+    '+': 8, '=': 8, '<': 8, '>': 8, '@': 12, '#': 8.5, '$': 7.5, '%': 12, '^': 7,
+    '&': 9.5, '*': 6, '~': 8, '`': 5, "'": 4, '"': 6
+  };
+
+  let totalWidth = 0;
+  for (let char of text) {
+    const lowerChar = char.toLowerCase();
+    if (charWidths[lowerChar]) {
+      // For uppercase letters, add 10% more width
+      const baseWidth = charWidths[lowerChar];
+      totalWidth += char === char.toUpperCase() && char !== char.toLowerCase() ? baseWidth * 1.1 : baseWidth;
+    } else {
+      // Default width for unknown characters (more generous)
+      totalWidth += 8;
+    }
+  }
+
+  // Add letter spacing (0.025em = 0.025 * fontSize)
+  totalWidth += (text.length - 1) * (fontSize * 0.025);
+
+  // Add a safety margin to prevent clipping (20% buffer for better accuracy)
+  totalWidth *= 1.2;
+
+  return Math.ceil(totalWidth);
+}
+
 function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded') {
   let finalTextColor;
   if (textColor && textColor !== 'auto') {
@@ -588,10 +629,16 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded')
   } else {
     finalTextColor = getBestTextColor(bgColor);
   }
-  
+
   const dims = calculateBadgeDimensions(text, iconData);
   const fontSize = 12;
   const fontFamily = 'Verdana, system-ui, sans-serif';
+
+  // Calculate exact text width server-side for GitHub compatibility
+  const textWidth = calculateTextWidth(text, fontSize);
+
+  // Calculate total width with consistent padding
+  const totalWidth = dims.padding + dims.iconWidth + dims.iconPadding + textWidth + dims.padding;
 
   // Determine corner radius based on edges parameter
   let cornerRadius = '';
@@ -614,73 +661,13 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded')
       cornerRadius = 'rx="8" ry="8"'; // default to rounded
   }
 
-  // Use dynamic CSS-based sizing with consistent padding
-  const iconSection = iconData ? `
-    <image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" class="badge-icon"/>` : '';
-  
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="${dims.height}" viewBox="0 0 200 ${dims.height}" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality" class="badge-container">
-    <defs>
-      <style>
-        .badge-container {
-          width: fit-content;
-          height: ${dims.height}px;
-        }
-        .badge-background {
-          fill: ${bgColor};
-          ${cornerRadius.replace(/"/g, '')};
-          height: ${dims.height}px;
-        }
-        .badge-text {
-          font-family: ${fontFamily};
-          font-size: ${fontSize}px;
-          font-weight: 600;
-          letter-spacing: 0.025em;
-          text-rendering: optimizeLegibility;
-          fill: ${finalTextColor};
-          dominant-baseline: middle;
-          text-anchor: start;
-        }
-        .badge-icon {
-          image-rendering: optimizeQuality;
-        }
-      </style>
-    </defs>
-    
-    <!-- Background rectangle with customizable edges -->
-    <rect class="badge-background" x="0" y="0" width="200" ${cornerRadius}/>
-    
-    <!-- Icon if present -->
+  // Generate SVG with exact dimensions (no JavaScript needed)
+  const iconSection = iconData ? `<image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" style="image-rendering: optimizeQuality;"/>` : '';
+
+  return `<svg width="${totalWidth}" height="${dims.height}" viewBox="0 0 ${totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+    <rect width="${totalWidth}" height="${dims.height}" fill="${bgColor}" ${cornerRadius}/>
     ${iconSection}
-    
-    <!-- Text with proper vertical centering -->
-    <text x="${dims.padding + dims.iconWidth + dims.iconPadding}" y="${dims.height / 2}" class="badge-text">${text}</text>
-    
-    <script type="application/javascript">
-      <![CDATA[
-      // Auto-size the SVG based on actual text dimensions
-      (function() {
-        const svg = document.currentScript.closest('svg');
-        const textElement = svg.querySelector('.badge-text');
-        const background = svg.querySelector('.badge-background');
-        
-        if (textElement && background && svg) {
-          // Get the actual rendered text dimensions
-          const textBBox = textElement.getBBox();
-          const padding = ${dims.padding};
-          const iconWidth = ${dims.iconWidth};
-          const iconPadding = ${dims.iconPadding};
-          
-          // Calculate total width with consistent padding
-          const totalWidth = padding + iconWidth + iconPadding + textBBox.width + padding;
-          
-          // Update the SVG and background with proper dimensions
-          svg.setAttribute('width', totalWidth);
-          svg.setAttribute('viewBox', '0 0 ' + totalWidth + ' ${dims.height}');
-          background.setAttribute('width', totalWidth);
-        }
-      })();
-      ]]>
-    </script>
+    <text x="${dims.padding + dims.iconWidth + dims.iconPadding}" y="${dims.height / 2}" text-anchor="start" dominant-baseline="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.025em;">${text}</text>
   </svg>`;
 }
 
