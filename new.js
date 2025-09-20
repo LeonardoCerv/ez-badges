@@ -99,71 +99,163 @@ function parseColor(color) {
     return COLORS.white;
   }
   
-  if (/^[0-9A-Fa-f]{6}$/.test(color)) {
-    // 6-character hex string
-    return {
-      r: parseInt(color.substr(0, 2), 16),
-      g: parseInt(color.substr(2, 2), 16),
-      b: parseInt(color.substr(4, 2), 16)
-    };
+  // Handle hex colors - accept both with and without # prefix
+  let hex = color;
+  if (color.startsWith('#')) {
+    hex = color.slice(1);
+  } else if (/^[0-9A-Fa-f]{6}$/.test(color)) {
+    // If it's a 6-character hex string without #, treat it as hex
+    hex = color;
   } else {
     // Handle named colors
     return COLORS[color.toLowerCase()] || COLORS.white;
   }
+  
+  // Validate hex format (6 characters)
+  if (!/^[0-9A-Fa-f]{6}$/.test(hex)) {
+    return COLORS.white;
+  }
+  
+  return {
+    r: parseInt(hex.substr(0, 2), 16),
+    g: parseInt(hex.substr(2, 2), 16),
+    b: parseInt(hex.substr(4, 2), 16)
+  };
 }
 
-// TODO: improve cleanliness
+function getLuminance(r, g, b) {
+  const normalize = (val) => {
+    val = val / 255;
+    return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * normalize(r) + 0.7152 * normalize(g) + 0.0722 * normalize(b);
+}
+
+function getContrastRatio(color1, color2) {
+  const rgb1 = parseColor(color1);
+  const rgb2 = parseColor(color2);
+
+  const lum1 = getLuminance(rgb1.r, rgb1.g, rgb1.b);
+  const lum2 = getLuminance(rgb2.r, rgb2.g, rgb2.b);
+
+  const lighter = Math.max(lum1, lum2);
+  const darker = Math.min(lum1, lum2);
+
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getBestTextColor(backgroundColor) {
+  const whiteContrast = getContrastRatio(backgroundColor, 'white');
+  const blackContrast = getContrastRatio(backgroundColor, 'black');
+
+  const baseColor = whiteContrast > blackContrast ? 'white' : 'black';
+  
+  // Make the text color slightly lighter for better vibrancy
+  if (baseColor === 'white') {
+    return 'rgb(255, 255, 255)'; // Pure white
+  } else {
+    return 'rgb(180, 180, 180)'; // Even lighter gray
+  }
+}
+
+function isHexColor(color) {
+  if (typeof color !== 'string') return false;
+  // Check if it starts with # or is a 6-character hex string
+  return color.startsWith('#') || /^[0-9A-Fa-f]{6}$/.test(color);
+}
+
+function formatColorForSvg(color) {
+  if (isHexColor(color)) {
+    return color.startsWith('#') ? color : `#${color}`;
+  } else {
+    const parsedColor = parseColor(color);
+    return `rgb(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b})`;
+  }
+}
+
 // Enhanced color processing for better quality
 function enhanceColorProcessing(svgString, targetColor) {
+  if (!targetColor) return svgString;
+
+  const finalColor = formatColorForSvg(targetColor);
   const rgb = parseColor(targetColor);
-  const finalColor = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
 
   // Simple and reliable color replacement - focus on main fill attributes
   let enhanced = svgString;
 
   // Check if this is a pixel image embedded in SVG (contains <image> tag)
   if (enhanced.includes('<image')) {
-    // For pixel images, use a colorization filter without enhancement
-    const subtleFilter = `
-        <filter id="subtle-colorize">
+    // For pixel images, use a more vibrant colorization approach
+    const vibrantFilter = `
+        <filter id="vibrant-colorize">
           <feComponentTransfer>
-            <feFuncR type="linear" slope="1.0" intercept="0"/>
-            <feFuncG type="linear" slope="1.0" intercept="0"/>
-            <feFuncB type="linear" slope="1.0" intercept="0"/>
+            <feFuncR type="linear" slope="1.3" intercept="0"/>
+            <feFuncG type="linear" slope="1.3" intercept="0"/>
+            <feFuncB type="linear" slope="1.3" intercept="0"/>
           </feComponentTransfer>
-          <feColorMatrix type="saturate" values="1.0"/>
+          <feColorMatrix type="saturate" values="0"/>
           <feColorMatrix type="matrix" values="0 0 0 0 ${rgb.r/255}
                                                0 0 0 0 ${rgb.g/255}
                                                0 0 0 0 ${rgb.b/255}
                                                0 0 0 1 0"/>
           <feComponentTransfer>
-            <feFuncR type="gamma" amplitude="1" exponent="1.0"/>
-            <feFuncG type="gamma" amplitude="1" exponent="1.0"/>
-            <feFuncB type="gamma" amplitude="1" exponent="1.0"/>
+            <feFuncR type="gamma" amplitude="1" exponent="1.4"/>
+            <feFuncG type="gamma" amplitude="1" exponent="1.4"/>
+            <feFuncB type="gamma" amplitude="1" exponent="1.4"/>
           </feComponentTransfer>
-          <feColorMatrix type="saturate" values="1.0"/>
+          <feColorMatrix type="saturate" values="1.5"/>
         </filter>`;
     
     // Add the filter to defs section
-    enhanced = enhanced.replace('<defs>', `<defs>${subtleFilter}`);
+    enhanced = enhanced.replace('<defs>', `<defs>${vibrantFilter}`);
     
     // Apply the filter to the image element
     enhanced = enhanced.replace(/<image([^>]*?)\/>/g, (match, attrs) => {
       // Check if filter is already applied
       if (attrs.includes('filter=')) {
-        return match.replace(/filter="[^"]*"/, `filter="url(#subtle-colorize)"`);
+        return match.replace(/filter="[^"]*"/, `filter="url(#vibrant-colorize)"`);
       } else {
-        return `<image${attrs} filter="url(#subtle-colorize)"/>`;
+        return `<image${attrs} filter="url(#vibrant-colorize)"/>`;
       }
     });
     
     return enhanced;
   }
 
-  // For pure SVG content, no filter needed since colors are replaced directly
-  // Skip filter application for pure SVGs to ensure exact color matching
-  // Replace fill attributes - handle both single and double quotes
-  enhanced = enhanced.replace(/fill=(["'])([^"']*)\1/gi, (match, quote, value) => {
+  // For pure SVG content, enhance colors to be more vibrant
+  // First, add a brightness/saturation filter to the defs
+  const vibrantSvgFilter = `
+      <filter id="svg-vibrant">
+        <feComponentTransfer>
+          <feFuncR type="linear" slope="1.2" intercept="0"/>
+          <feFuncG type="linear" slope="1.2" intercept="0"/>
+          <feFuncB type="linear" slope="1.2" intercept="0"/>
+        </feComponentTransfer>
+        <feColorMatrix type="saturate" values="1.8"/>
+        <feComponentTransfer>
+          <feFuncR type="gamma" amplitude="1" exponent="1.3"/>
+          <feFuncG type="gamma" amplitude="1" exponent="1.3"/>
+          <feFuncB type="gamma" amplitude="1" exponent="1.3"/>
+        </feComponentTransfer>
+      </filter>`;
+  
+  // Add the filter to defs section if it exists, otherwise create it
+  if (enhanced.includes('<defs>')) {
+    enhanced = enhanced.replace('<defs>', `<defs>${vibrantSvgFilter}`);
+  } else {
+    enhanced = enhanced.replace('<svg', `<svg><defs>${vibrantSvgFilter}</defs>`);
+  }
+  
+  // Apply the filter to the main SVG element
+  enhanced = enhanced.replace(/<svg([^>]*?)>/, (match, attrs) => {
+    if (attrs.includes('filter=')) {
+      return match.replace(/filter="[^"]*"/, `filter="url(#svg-vibrant)"`);
+    } else {
+      return `<svg${attrs} filter="url(#svg-vibrant)">`;
+    }
+  });
+  // Replace fill attributes - be more conservative
+  enhanced = enhanced.replace(/fill="([^"]*)"/gi, (match, value) => {
     const normalizedValue = value.trim().toLowerCase();
     // Preserve special values
     if (normalizedValue === 'none' ||
@@ -172,11 +264,11 @@ function enhanceColorProcessing(svgString, targetColor) {
         normalizedValue.includes('gradient')) {
       return match;
     }
-    return `fill=${quote}${finalColor}${quote}`;
+    return `fill="${finalColor}"`;
   });
 
   // Replace stroke attributes
-  enhanced = enhanced.replace(/stroke=(["'])([^"']*)\1/gi, (match, quote, value) => {
+  enhanced = enhanced.replace(/stroke="([^"]*)"/gi, (match, value) => {
     const normalizedValue = value.trim().toLowerCase();
     if (normalizedValue === 'none' ||
         normalizedValue === 'transparent' ||
@@ -184,48 +276,19 @@ function enhanceColorProcessing(svgString, targetColor) {
         normalizedValue.includes('gradient')) {
       return match;
     }
-    return `stroke=${quote}${finalColor}${quote}`;
+    return `stroke="${finalColor}"`;
   });
 
-  // Replace colors in <style> tags
-  enhanced = enhanced.replace(/<style[^>]*>(.*?)<\/style>/gi, (match, content) => {
-    let newContent = content;
-    // Replace fill: color
-    newContent = newContent.replace(/fill:\s*([^;}]+)/gi, `fill: ${finalColor}`);
-    // Replace stroke: color
-    newContent = newContent.replace(/stroke:\s*([^;}]+)/gi, `stroke: ${finalColor}`);
-    // Replace other color properties
-    newContent = newContent.replace(/color:\s*([^;}]+)/gi, `color: ${finalColor}`);
-    newContent = newContent.replace(/stop-color:\s*([^;}]+)/gi, `stop-color: ${finalColor}`);
-    return match.replace(content, newContent);
-  });
-
-  // Replace fill and stroke in style attributes
-  enhanced = enhanced.replace(/style=(["'])([^"']*)\1/gi, (match, quote, content) => {
-    let newContent = content;
-    // Replace fill: color
-    newContent = newContent.replace(/fill:\s*([^;]+)/gi, (m, color) => {
-      const normalizedColor = color.trim().toLowerCase();
-      if (normalizedColor === 'none' ||
-          normalizedColor === 'transparent' ||
-          normalizedColor.startsWith('url(') ||
-          normalizedColor.includes('gradient')) {
-        return m;
-      }
-      return `fill: ${finalColor}`;
-    });
-    // Replace stroke: color
-    newContent = newContent.replace(/stroke:\s*([^;]+)/gi, (m, color) => {
-      const normalizedColor = color.trim().toLowerCase();
-      if (normalizedColor === 'none' ||
-          normalizedColor === 'transparent' ||
-          normalizedColor.startsWith('url(') ||
-          normalizedColor.includes('gradient')) {
-        return m;
-      }
-      return `stroke: ${finalColor}`;
-    });
-    return `style=${quote}${newContent}${quote}`;
+  // Replace fill in style attributes
+  enhanced = enhanced.replace(/style="([^"]*?)fill:\s*([^;"]+)([^"]*?)"/gi, (match, before, color, after) => {
+    const normalizedColor = color.trim().toLowerCase();
+    if (normalizedColor === 'none' ||
+        normalizedColor === 'transparent' ||
+        normalizedColor.startsWith('url(') ||
+        normalizedColor.includes('gradient')) {
+      return match;
+    }
+    return `style="${before}fill: ${finalColor}${after}"`;
   });
 
   // Add default fill to path elements that don't have fill
@@ -246,6 +309,18 @@ function enhanceColorProcessing(svgString, targetColor) {
     });
   });
 
+  // Replace stroke in style attributes
+  enhanced = enhanced.replace(/style="([^"]*?)stroke:\s*([^;"]+)([^"]*?)"/gi, (match, before, color, after) => {
+    const normalizedColor = color.trim().toLowerCase();
+    if (normalizedColor === 'none' ||
+        normalizedColor === 'transparent' ||
+        normalizedColor.startsWith('url(') ||
+        normalizedColor.includes('gradient')) {
+      return match;
+    }
+    return `style="${before}stroke: ${finalColor}${after}"`;
+  });
+
   return enhanced;
 }
 
@@ -254,8 +329,10 @@ function enhanceColorProcessing(svgString, targetColor) {
 // =============================================================================
 
 function resolveIconUrl(iconParam) {
+  if (!iconParam) return null;
+  
+  // Check if it's a provider:icon format
   const colonIndex = iconParam.indexOf(':');
-
   if (colonIndex > 0) {
     const provider = iconParam.substring(0, colonIndex);
     const iconName = iconParam.substring(colonIndex + 1);
@@ -266,40 +343,32 @@ function resolveIconUrl(iconParam) {
     }
   }
   
+  // Otherwise, treat as direct URL
   return iconParam;
 }
 
 async function processIcon(iconParam, iconColor) {
-  if (!iconParam) return null;
   const url = resolveIconUrl(iconParam);
+  if (!url) return null;
 
+  // Fetch and process image
   const buffer = await fetchImage(url);
   if (!buffer) return null;
 
-  let svg;
+  let result;
   if (isSvgBuffer(buffer)) {
-    svg = await processSvgImage(buffer);
+    result = await processSvgImage(buffer, iconColor);
   } else {
     // Convert raster images to true vector paths
-    svg = await processPixelImage(buffer);
+    result = await processPixelImage(buffer, iconColor);
   }
 
-  // change svg color
-  if (iconColor) {
-    const base64 = svg.dataUri.replace('data:image/svg+xml;base64,', '');
-    const svgString = Buffer.from(base64, 'base64').toString('utf8');
-
-    const enhancedSvg = enhanceColorProcessing(svgString, iconColor);
-
-    const newBase64 = Buffer.from(enhancedSvg).toString('base64');
-    svg.dataUri = `data:image/svg+xml;base64,${newBase64}`;
-  }
-
-  return svg;
+  return result;
 }
 
 async function fetchImage(url) {
   try {
+    console.log('Fetching image:', url);
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
       timeout: 10000, // Increased timeout for high-quality images
@@ -313,9 +382,39 @@ async function fetchImage(url) {
 
     const buffer = Buffer.from(response.data);
 
+    // Enhanced file size validation with better limits for quality
+    if (buffer.length > 5 * 1024 * 1024) {
+      console.warn('Image too large, but attempting to process:', buffer.length);
+      // Don't immediately reject, try to process but with more conservative settings
+    }
+
+    // Additional content validation
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.startsWith('image/') && !isSvgBuffer(buffer)) {
+      console.warn('Unexpected content type:', contentType);
+    }
+
     return buffer;
   } catch (error) {
     console.error('Failed to fetch image:', error.message);
+    
+    // Implement retry logic for transient failures
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET') {
+      console.log('Retrying image fetch...');
+      try {
+        const retryResponse = await axios.get(url, {
+          responseType: 'arraybuffer',
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)'
+          }
+        });
+        return Buffer.from(retryResponse.data);
+      } catch (retryError) {
+        console.error('Retry failed:', retryError.message);
+      }
+    }
+    
     return null;
   }
 }
@@ -369,25 +468,27 @@ function isSvgBuffer(buffer) {
          (normalized.startsWith('<?xml') && normalized.includes('svg'));
 }
 
-async function processSvgImage(buffer) {
+async function processSvgImage(buffer, iconColor) {
   try {
+    let svgString = buffer.toString('utf8');
+
     // Sanitize SVG for security while preserving all quality elements
     const window = new JSDOM('').window;
-    let svg = DOMPurify(window).sanitize(buffer.toString('utf8'), {
+    let cleanSvg = DOMPurify(window).sanitize(svgString, {
       USE_PROFILES: { svg: true, svgFilters: true },
       ALLOW_TAGS: ['svg', 'path', 'circle', 'rect', 'ellipse', 'line', 'polygon', 'polyline', 'g', 'defs', 'clipPath', 'mask', 'linearGradient', 'radialGradient', 'stop', 'filter', 'feColorMatrix', 'feGaussianBlur', 'feOffset', 'feMerge', 'feMergeNode'],
       ALLOW_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width', 'viewBox', 'transform', 'style', 'id', 'class', 'values', 'type', 'gradientUnits', 'x1', 'y1', 'x2', 'y2', 'offset', 'stdDeviation', 'in', 'result']
     });
 
     // Extract original dimensions
-    const viewBox = svg.match(/viewBox=["']([^"']+)["']/);
-    const width = svg.match(/width=["']([^"']+)["']/);
-    const height = svg.match(/height=["']([^"']+)["']/);
+    const viewBoxMatch = cleanSvg.match(/viewBox=["']([^"']+)["']/);
+    const widthMatch = cleanSvg.match(/width=["']([^"']+)["']/);
+    const heightMatch = cleanSvg.match(/height=["']([^"']+)["']/);
 
     let originalWidth = 24, originalHeight = 24, viewBoxX = 0, viewBoxY = 0;
 
-    if (viewBox) {
-      const parts = viewBox[1].split(/\s+/);
+    if (viewBoxMatch) {
+      const parts = viewBoxMatch[1].split(/\s+/);
       if (parts.length >= 4) {
         viewBoxX = parseFloat(parts[0]) || 0;
         viewBoxY = parseFloat(parts[1]) || 0;
@@ -395,8 +496,8 @@ async function processSvgImage(buffer) {
         originalHeight = parseFloat(parts[3]) || 24;
       }
     } else {
-      if (width) originalWidth = parseFloat(width[1]) || 24;
-      if (height) originalHeight = parseFloat(height[1]) || 24;
+      if (widthMatch) originalWidth = parseFloat(widthMatch[1]) || 24;
+      if (heightMatch) originalHeight = parseFloat(heightMatch[1]) || 24;
     }
 
     // Ensure positive dimensions
@@ -405,23 +506,41 @@ async function processSvgImage(buffer) {
 
     // Calculate final dimensions (maintain aspect ratio but target reasonable size for badge fit)
     const aspectRatio = originalWidth / originalHeight;
-    const targetHeight = 16;
+    let targetHeight = 16;
     let targetWidth;
 
     if (isNaN(aspectRatio) || !isFinite(aspectRatio)) {
       targetWidth = 16;
     } else {
       targetWidth = Math.round(targetHeight * aspectRatio);
+      // For brand logos like Simple Icons, allow reasonable width but cap at badge-friendly size
+      const maxWidth = 40; // Allow wider logos to show properly
+      if (targetWidth > maxWidth) {
+        targetWidth = maxWidth;
+        targetHeight = Math.round(maxWidth / aspectRatio);
+        // Ensure minimum height for visibility
+        if (targetHeight < 12) {
+          targetHeight = 12;
+          targetWidth = Math.round(targetHeight * aspectRatio);
+        }
+      }
     }
 
+    // Apply color processing if needed - but preserve SVG nature
+    if (iconColor) {
+      cleanSvg = enhanceColorProcessing(cleanSvg, iconColor);
+    }
+
+    // Remove any existing xmlns declarations to avoid conflicts
+    cleanSvg = cleanSvg.replace(/\s*xmlns[^=]*="[^"]*"/g, '');
+
     // Create ultra-high-quality SVG - preserve original aspect ratio
-    let enhancedSvg = svg
+    let enhancedSvg = cleanSvg
       .replace(/<svg[^>]*>/i, (match) => {
-
-        match = match.replace(/\s*xmlns[^=]*="[^"]*"/g, '');
-
+        // Extract existing attributes
         let attrs = match.replace(/<svg\s*/i, '').replace(/>\s*$/, '');
 
+        // Remove existing width, height, viewBox to replace them
         attrs = attrs.replace(/\s*(width|height|viewBox)="[^"]*"/gi, '');
 
         // Add quality rendering attributes and dimensions
@@ -440,6 +559,8 @@ async function processSvgImage(buffer) {
       });
 
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(enhancedSvg).toString('base64')}`;
+
+    console.log('Pure SVG processed (vector quality):', `${targetWidth}x${targetHeight}`, 'from', `${originalWidth}x${originalHeight}`);
     return { dataUri, width: targetWidth, height: targetHeight };
   } catch (error) {
     console.error('SVG processing failed:', error.message);
@@ -447,7 +568,7 @@ async function processSvgImage(buffer) {
   }
 }
 
-async function processPixelImage(buffer) {
+async function processPixelImage(buffer, iconColor) {
   try {
     if (!isValidImageBuffer(buffer)) {
       return null;
@@ -481,6 +602,20 @@ async function processPixelImage(buffer) {
         kernel: 'lanczos3',
         fastShrinkOnLoad: false
       })
+      .normalize() // Enhance contrast
+      .sharpen({ // Advanced sharpening for crisp edges
+        sigma: 1.0,
+        m1: 0.5,
+        m2: 3.0,
+        x1: 1,
+        y2: 15,
+        y3: 25
+      })
+      .gamma(1.1) // Slight gamma correction for better contrast
+      .modulate({
+        brightness: 1.05, // Slight brightness boost
+        saturation: 1.1   // Slight saturation boost for vibrancy
+      })
       .png({
         quality: 100,
         compressionLevel: 0,
@@ -491,12 +626,23 @@ async function processPixelImage(buffer) {
       .toBuffer();
 
     // Calculate final display size (set to 16px height for badge fit, but allow some flexibility)
-    const displayHeight = 16;
+    const displayHeight = Math.min(iconData.height, 20); // Allow up to 20px height for better visibility
     const displayWidth = Math.round(displayHeight * aspectRatio);
     
     // Cap width to prevent overflow but allow reasonable width for logos
+    const maxDisplayWidth = 28;
     let finalWidth = displayWidth;
     let finalHeight = displayHeight;
+    
+    if (displayWidth > maxDisplayWidth) {
+      finalWidth = maxDisplayWidth;
+      finalHeight = Math.round(maxDisplayWidth / aspectRatio);
+      // Ensure minimum height
+      if (finalHeight < 10) {
+        finalHeight = 10;
+        finalWidth = Math.round(finalHeight * aspectRatio);
+      }
+    }
 
     const base64 = processedBuffer.toString('base64');
 
@@ -504,16 +650,21 @@ async function processPixelImage(buffer) {
     let svg = `<svg width="${finalWidth}" height="${finalHeight}" viewBox="0 0 ${finalWidth} ${finalHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
       <defs>
         <filter id="icon-enhance">
-          <feColorMatrix type="saturate" values="1.0"/>
+          <feColorMatrix type="saturate" values="1.1"/>
           <feComponentTransfer>
-            <feFuncR type="gamma" amplitude="1" exponent="1.0"/>
-            <feFuncG type="gamma" amplitude="1" exponent="1.0"/>
-            <feFuncB type="gamma" amplitude="1" exponent="1.0"/>
+            <feFuncR type="gamma" amplitude="1" exponent="0.9"/>
+            <feFuncG type="gamma" amplitude="1" exponent="0.9"/>
+            <feFuncB type="gamma" amplitude="1" exponent="0.9"/>
           </feComponentTransfer>
         </filter>
       </defs>
       <image href="data:image/png;base64,${base64}" width="${finalWidth}" height="${finalHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
     </svg>`;
+
+    // Apply color processing to the final SVG if iconColor is specified
+    if (iconColor) {
+      svg = enhanceColorProcessing(svg, iconColor);
+    }
 
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 
@@ -529,7 +680,7 @@ async function processPixelImage(buffer) {
 // BADGE GENERATION
 // =============================================================================
 
-function calculateBadgeDimensions(iconData) {
+function calculateBadgeDimensions(text, iconData) {
   // Fixed padding values that don't change based on text length
   const padding = 12; // Consistent padding on left and right
   const iconPadding = iconData ? 8 : 0; // Space between icon and text
@@ -567,7 +718,7 @@ function calculateBadgeDimensions(iconData) {
     padding,
     iconPadding,
     iconX: padding,
-    iconY: Math.round((height - iconHeight - 2) / 2 ),
+    iconY: Math.round((height - iconHeight) / 2 ),
     textX: padding + iconWidth + iconPadding, // Start position for text
     textY: Math.round(height / 2 + 4)
   };
@@ -614,17 +765,21 @@ function calculateTextWidth(text, fontSize = 12, fontFamily = 'Verdana') {
   return Math.ceil(totalWidth);
 }
 
-function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
+function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded') {
   let finalTextColor;
+  if (textColor && textColor !== 'auto') {
+    // Parse and format the textColor consistently, making it slightly lighter
+    const parsedColor = parseColor(textColor);
+    // Make the color 40% lighter for better vibrancy
+    const lighterR = Math.min(255, Math.round(parsedColor.r * 1.4));
+    const lighterG = Math.min(255, Math.round(parsedColor.g * 1.4));
+    const lighterB = Math.min(255, Math.round(parsedColor.b * 1.4));
+    finalTextColor = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
+  } else {
+    finalTextColor = 'rgb(255, 255, 255)'; // Default to white text
+  }
 
-  // Parse and format the textColor consistently, making it slightly lighter
-  const bgParsed = parseColor(bgColor);
-  const bgColorFormatted = `rgb(${bgParsed.r}, ${bgParsed.g}, ${bgParsed.b})`;
-
-  const parsedColor = parseColor(textColor);
-  finalTextColor = `rgb(${parsedColor.r}, ${parsedColor.g}, ${parsedColor.b})`;
-
-  const dims = calculateBadgeDimensions(iconData);
+  const dims = calculateBadgeDimensions(text, iconData);
   const fontSize = 11;
   const fontFamily = 'Verdana, system-ui, sans-serif';
 
@@ -642,54 +797,26 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
       cornerRadius = 'rx="8" ry="8"';
       break;
     case 'square':
-    case 'sharp':
     case 'squared':
+      cornerRadius = 'rx="0" ry="0"';
+      break;
+    case 'sharp':
       cornerRadius = 'rx="0" ry="0"';
       break;
     case 'pill':
       cornerRadius = `rx="${dims.height / 2}" ry="${dims.height / 2}"`;
       break;
+    default:
+      cornerRadius = 'rx="8" ry="8"'; // default to rounded
   }
 
   // Generate SVG with exact dimensions (no JavaScript needed)
-  const iconSection = iconData ? `
-  <image 
-    href="${iconData.dataUri}" 
-    x="${dims.iconX}" 
-    y="${dims.iconY}" 
-    width="${dims.iconWidth}" 
-    height="${dims.iconHeight}" 
-    style="image-rendering: optimizeQuality;"/>
-    `: '';
+  const iconSection = iconData ? `<image href="${iconData.dataUri}" x="${dims.iconX}" y="${dims.iconY}" width="${dims.iconWidth}" height="${dims.iconHeight}" style="image-rendering: optimizeQuality;"/>` : '';
 
-  return `
-    <svg 
-      fill="white" 
-      width="${totalWidth}" 
-      height="${dims.height}" 
-      viewBox="0 0 ${totalWidth} ${dims.height}" 
-      xmlns="http://www.w3.org/2000/svg" 
-      shape-rendering="geometricPrecision" 
-      text-rendering="optimizeLegibility" 
-      image-rendering="optimizeQuality" 
-      color-rendering="optimizeQuality">
-    <rect 
-      width="${totalWidth}" 
-      height="${dims.height}" 
-      fill="${bgColorFormatted}" 
-      ${cornerRadius}/>
+  return `<svg width="${totalWidth}" height="${dims.height}" viewBox="0 0 ${totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+    <rect width="${totalWidth}" height="${dims.height}" fill="${bgColor}" ${cornerRadius}/>
     ${iconSection}
-    <text 
-      x="${dims.padding + dims.iconWidth + dims.iconPadding}" 
-      y="${dims.height / 2}" 
-      text-anchor="start" 
-      dominant-baseline="middle" 
-      fill="${finalTextColor}" 
-      font-size="${fontSize}" 
-      font-weight="600" 
-      font-family="${fontFamily}" 
-      style="text-rendering: optimizeLegibility; 
-      letter-spacing: 0.2em;">${text}</text>
+    <text x="${dims.padding + dims.iconWidth + dims.iconPadding}" y="${dims.height / 2}" text-anchor="start" dominant-baseline="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.1em;">${text}</text>
   </svg>`;
 }
 
@@ -699,16 +826,32 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
 
 app.get('/badge', async (req, res) => {
   const {
-    text,
-    icon,
+    text = 'Badge',
     bgColor = 'white',
+    icon,
     iconColor,
-    textColor = 'white',
-    edges = 'squared'
+    textColor,
+    edges = 'rounded'
   } = req.query;
-  
-  const iconData = await processIcon(icon, iconColor);
-  const svg = generateBadgeSvg(text, bgColor, iconData, textColor, edges);
+
+  // Parse bgColor to handle both hex and named colors
+  const parsedBgColor = parseColor(bgColor);
+  // Make the background color lighter and more subtle
+  const lighterR = Math.min(255, Math.round(parsedBgColor.r * 1.15 + 20));
+  const lighterG = Math.min(255, Math.round(parsedBgColor.g * 1.15 + 20));
+  const lighterB = Math.min(255, Math.round(parsedBgColor.b * 1.15 + 20));
+  const finalBgColor = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
+
+  // Process icon if provided
+  let iconData = null;
+  if (icon) {
+    // Default icon color to white if not specified
+    const finalIconColor = iconColor || 'white';
+    iconData = await processIcon(icon, finalIconColor);
+  }
+
+  // Generate SVG badge
+  const svg = generateBadgeSvg(text, finalBgColor, iconData, textColor, edges);
 
   // Send response
   res.setHeader('Content-Type', 'image/svg+xml');
