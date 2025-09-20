@@ -8,90 +8,57 @@ const potrace = require('potrace');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// =============================================================================
-// COLOR UTILITIES
-// =============================================================================
-
 const COLORS = {
-  black:         { r: 0, g: 0, b: 0 },
-  white:         { r: 255, g: 255, b: 255 },
-
-  // Grays & Neutrals
-  grayLight:     { r: 245, g: 245, b: 247 },
-  gray:          { r: 128, g: 128, b: 128 },
-  grayDark:      { r: 64, g: 64, b: 64 },
-  slate:         { r: 112, g: 128, b: 144 },
-  charcoal:      { r: 54, g: 69, b: 79 },
-
-  // Blues
-  blue:          { r: 0, g: 122, b: 255 },
-  lightBlue:     { r: 173, g: 216, b: 230 },
-  skyBlue:       { r: 135, g: 206, b: 235 },
-  teal:          { r: 0, g: 150, b: 136 },
-  cyan:          { r: 0, g: 188, b: 212 },
-
-  // Greens
-  green:         { r: 76, g: 175, b: 80 },
-  mint:          { r: 152, g: 251, b: 152 },
-  seafoam:       { r: 120, g: 219, b: 226 },
-  olive:         { r: 128, g: 128, b: 0 },
-  emerald:       { r: 80, g: 200, b: 120 },
-
-  // Yellows & Oranges
-  yellow:        { r: 255, g: 235, b: 59 },
-  amber:         { r: 255, g: 191, b: 0 },
-  orange:        { r: 255, g: 152, b: 0 },
-  peach:         { r: 255, g: 218, b: 185 },
-  gold:          { r: 255, g: 215, b: 0 },
-
-  // Reds & Pinks
-  red:           { r: 244, g: 67, b: 54 },
-  coral:         { r: 255, g: 127, b: 80 },
-  salmon:        { r: 250, g: 128, b: 114 },
-  pink:          { r: 255, g: 192, b: 203 },
-  rose:          { r: 255, g: 102, b: 102 },
-
-  // Purples
-  purple:        { r: 156, g: 39, b: 176 },
-  lavender:      { r: 230, g: 230, b: 250 },
-  lilac:         { r: 200, g: 162, b: 200 },
-  violet:        { r: 148, g: 0, b: 211 },
-  indigo:        { r: 75, g: 0, b: 130 },
-
-  // Modern "Soft" Tones
-  sand:          { r: 244, g: 236, b: 219 },
-  beige:         { r: 245, g: 245, b: 220 },
-  ivory:         { r: 255, g: 255, b: 240 },
-  blush:         { r: 222, g: 93, b: 131 },
-  sage:          { r: 188, g: 184, b: 138 },
-  dustyBlue:     { r: 96, g: 147, b: 172 },
-  terracotta:    { r: 204, g: 78, b: 92 }
+  black: { r: 0, g: 0, b: 0 },
+  white: { r: 255, g: 255, b: 255 },
+  grayLight: { r: 245, g: 245, b: 247 },
+  gray: { r: 128, g: 128, b: 128 },
+  grayDark: { r: 64, g: 64, b: 64 },
+  slate: { r: 112, g: 128, b: 144 },
+  charcoal: { r: 54, g: 69, b: 79 },
+  blue: { r: 0, g: 122, b: 255 },
+  lightBlue: { r: 173, g: 216, b: 230 },
+  skyBlue: { r: 135, g: 206, b: 235 },
+  teal: { r: 0, g: 150, b: 136 },
+  cyan: { r: 0, g: 188, b: 212 },
+  green: { r: 76, g: 175, b: 80 },
+  mint: { r: 152, g: 251, b: 152 },
+  seafoam: { r: 120, g: 219, b: 226 },
+  olive: { r: 128, g: 128, b: 0 },
+  emerald: { r: 80, g: 200, b: 120 },
+  yellow: { r: 255, g: 235, b: 59 },
+  amber: { r: 255, g: 191, b: 0 },
+  orange: { r: 255, g: 152, b: 0 },
+  peach: { r: 255, g: 218, b: 185 },
+  gold: { r: 255, g: 215, b: 0 },
+  red: { r: 244, g: 67, b: 54 },
+  coral: { r: 255, g: 127, b: 80 },
+  salmon: { r: 250, g: 128, b: 114 },
+  pink: { r: 255, g: 192, b: 203 },
+  rose: { r: 255, g: 102, b: 102 },
+  purple: { r: 156, g: 39, b: 176 },
+  lavender: { r: 230, g: 230, b: 250 },
+  lilac: { r: 200, g: 162, b: 200 },
+  violet: { r: 148, g: 0, b: 211 },
+  indigo: { r: 75, g: 0, b: 130 },
+  sand: { r: 244, g: 236, b: 219 },
+  beige: { r: 245, g: 245, b: 220 },
+  ivory: { r: 255, g: 255, b: 240 },
+  blush: { r: 222, g: 93, b: 131 },
+  sage: { r: 188, g: 184, b: 138 },
+  dustyBlue: { r: 96, g: 147, b: 172 },
+  terracotta: { r: 204, g: 78, b: 92 }
 };
 
-// =============================================================================
-// ICON PROVIDERS
-// =============================================================================
-
 const ICON_PROVIDERS = {
-  // FontAwesome
   'fontawesome-solid': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/solid/{icon}.svg',
   'fontawesome-regular': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/regular/{icon}.svg',
   'fontawesome-brands': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/brands/{icon}.svg',
-  
-  // Bootstrap Icons
   'bootstrap': 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/icons/{icon}.svg',
-  
-  // Heroicons
   'heroicons-outline': 'https://unpkg.com/heroicons@2.0.18/24/outline/{icon}.svg',
   'heroicons-solid': 'https://unpkg.com/heroicons@2.0.18/24/solid/{icon}.svg',
-  
-  // Lucide Icons
   'lucide': 'https://unpkg.com/lucide-static@latest/icons/{icon}.svg',
-  
-  // Tabler Icons
   'tabler': 'https://unpkg.com/@tabler/icons@latest/icons/{icon}.svg',
-  
-  // Simple Icons (brands)
   'simple-icons': 'https://cdn.jsdelivr.net/npm/simple-icons@v10/icons/{icon}.svg'
 };
 
@@ -99,32 +66,24 @@ function parseColor(color) {
   if (typeof color !== 'string') {
     return COLORS.white;
   }
-  
+
   if (/^[0-9A-Fa-f]{6}$/.test(color)) {
-    // 6-character hex string
     return {
       r: parseInt(color.substr(0, 2), 16),
       g: parseInt(color.substr(2, 2), 16),
       b: parseInt(color.substr(4, 2), 16)
     };
   } else {
-    // Handle named colors
     return COLORS[color.toLowerCase()] || COLORS.white;
   }
 }
 
-// TODO: improve cleanliness
-// Enhanced color processing for better quality
-function enhanceColorProcessing(svgString, targetColor) {
+function changeSvgColor(svgString, targetColor) {
   const rgb = parseColor(targetColor);
   const finalColor = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-
-  // Simple and reliable color replacement - focus on main fill attributes
   let enhanced = svgString;
 
-  // Check if this is a pixel image embedded in SVG (contains <image> tag)
   if (enhanced.includes('<image')) {
-    // For pixel images, use a colorization filter without enhancement
     const subtleFilter = `
         <filter id="subtle-colorize">
           <feComponentTransfer>
@@ -144,29 +103,21 @@ function enhanceColorProcessing(svgString, targetColor) {
           </feComponentTransfer>
           <feColorMatrix type="saturate" values="1.0"/>
         </filter>`;
-    
-    // Add the filter to defs section
+
     enhanced = enhanced.replace('<defs>', `<defs>${subtleFilter}`);
-    
-    // Apply the filter to the image element
     enhanced = enhanced.replace(/<image([^>]*?)\/>/g, (match, attrs) => {
-      // Check if filter is already applied
       if (attrs.includes('filter=')) {
         return match.replace(/filter="[^"]*"/, `filter="url(#subtle-colorize)"`);
       } else {
         return `<image${attrs} filter="url(#subtle-colorize)"/>`;
       }
     });
-    
+
     return enhanced;
   }
 
-  // For pure SVG content, no filter needed since colors are replaced directly
-  // Skip filter application for pure SVGs to ensure exact color matching
-  // Replace fill attributes - handle both single and double quotes
   enhanced = enhanced.replace(/fill=(["'])([^"']*)\1/gi, (match, quote, value) => {
     const normalizedValue = value.trim().toLowerCase();
-    // Preserve special values
     if (normalizedValue === 'none' ||
         normalizedValue === 'transparent' ||
         normalizedValue.startsWith('url(') ||
@@ -176,7 +127,6 @@ function enhanceColorProcessing(svgString, targetColor) {
     return `fill=${quote}${finalColor}${quote}`;
   });
 
-  // Replace stroke attributes
   enhanced = enhanced.replace(/stroke=(["'])([^"']*)\1/gi, (match, quote, value) => {
     const normalizedValue = value.trim().toLowerCase();
     if (normalizedValue === 'none' ||
@@ -188,23 +138,17 @@ function enhanceColorProcessing(svgString, targetColor) {
     return `stroke=${quote}${finalColor}${quote}`;
   });
 
-  // Replace colors in <style> tags
   enhanced = enhanced.replace(/<style[^>]*>(.*?)<\/style>/gi, (match, content) => {
     let newContent = content;
-    // Replace fill: color
     newContent = newContent.replace(/fill:\s*([^;}]+)/gi, `fill: ${finalColor}`);
-    // Replace stroke: color
     newContent = newContent.replace(/stroke:\s*([^;}]+)/gi, `stroke: ${finalColor}`);
-    // Replace other color properties
     newContent = newContent.replace(/color:\s*([^;}]+)/gi, `color: ${finalColor}`);
     newContent = newContent.replace(/stop-color:\s*([^;}]+)/gi, `stop-color: ${finalColor}`);
     return match.replace(content, newContent);
   });
 
-  // Replace fill and stroke in style attributes
   enhanced = enhanced.replace(/style=(["'])([^"']*)\1/gi, (match, quote, content) => {
     let newContent = content;
-    // Replace fill: color
     newContent = newContent.replace(/fill:\s*([^;]+)/gi, (m, color) => {
       const normalizedColor = color.trim().toLowerCase();
       if (normalizedColor === 'none' ||
@@ -215,7 +159,6 @@ function enhanceColorProcessing(svgString, targetColor) {
       }
       return `fill: ${finalColor}`;
     });
-    // Replace stroke: color
     newContent = newContent.replace(/stroke:\s*([^;]+)/gi, (m, color) => {
       const normalizedColor = color.trim().toLowerCase();
       if (normalizedColor === 'none' ||
@@ -229,7 +172,6 @@ function enhanceColorProcessing(svgString, targetColor) {
     return `style=${quote}${newContent}${quote}`;
   });
 
-  // Add default fill to path elements that don't have fill
   enhanced = enhanced.replace(/(<path[^>]*?)(>)/gi, (match, tag, close) => {
     if (!tag.includes('fill=')) {
       return tag + ` fill="${finalColor}"` + close;
@@ -237,7 +179,6 @@ function enhanceColorProcessing(svgString, targetColor) {
     return match;
   });
 
-  // Add default fill to other common SVG elements
   ['circle', 'rect', 'ellipse', 'polygon', 'polyline'].forEach(element => {
     enhanced = enhanced.replace(new RegExp(`(<${element}[^>]*?)(>)`, 'gi'), (match, tag, close) => {
       if (!tag.includes('fill=')) {
@@ -250,27 +191,23 @@ function enhanceColorProcessing(svgString, targetColor) {
   return enhanced;
 }
 
-// =============================================================================
-// ICON PROCESSING
-// =============================================================================
-
 function resolveIconUrl(iconParam) {
   const colonIndex = iconParam.indexOf(':');
 
   if (colonIndex > 0) {
     const provider = iconParam.substring(0, colonIndex);
     const iconName = iconParam.substring(colonIndex + 1);
-    
+
     const template = ICON_PROVIDERS[provider];
     if (template) {
       return template.replace('{icon}', iconName);
     }
   }
-  
+
   return iconParam;
 }
 
-async function processIcon(iconParam, iconColor) {
+async function generateIcon(iconParam, iconColor) {
   if (!iconParam) return null;
   const url = resolveIconUrl(iconParam);
 
@@ -286,12 +223,10 @@ async function processIcon(iconParam, iconColor) {
 
   if (!result) return null;
 
-  // Apply color processing if iconColor is specified
   if (iconColor) {
-    result.svgString = enhanceColorProcessing(result.svgString, iconColor);
+    result.svgString = changeSvgColor(result.svgString, iconColor);
   }
 
-  // Encode to data URI
   const dataUri = `data:image/svg+xml;base64,${Buffer.from(result.svgString).toString('base64')}`;
   return { dataUri, width: result.width, height: result.height };
 }
@@ -300,8 +235,8 @@ async function fetchImage(url) {
   try {
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
-      timeout: 10000, // Increased timeout for high-quality images
-      maxContentLength: 5 * 1024 * 1024, // 5MB max for high-quality icons
+      timeout: 10000,
+      maxContentLength: 5 * 1024 * 1024,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; BadgeGenerator/1.0)',
         'Accept': 'image/svg+xml,image/png,image/jpeg,image/gif,image/webp,image/*;q=0.8,*/*;q=0.5',
@@ -320,15 +255,13 @@ async function fetchImage(url) {
 
 function isValidImageBuffer(buffer) {
   if (!buffer || buffer.length === 0) return false;
-  
+
   const start = buffer.toString('utf8', 0, Math.min(200, buffer.length));
-  
-  // Check for HTML error pages
+
   if (start.includes('<html') || start.includes('<!DOCTYPE') || start.includes('Error') || start.includes('<body')) {
     return false;
   }
-  
-  // Check for valid image signatures
+
   const signatures = {
     png: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
     jpeg: [0xFF, 0xD8, 0xFF],
@@ -337,39 +270,35 @@ function isValidImageBuffer(buffer) {
     webp: [0x52, 0x49, 0x46, 0x46],
     svg: start.includes('<svg') || start.includes('<?xml')
   };
-  
-  // Check binary signatures
+
   for (const [format, signature] of Object.entries(signatures)) {
-    if (format === 'svg') continue; // SVG is text-based
-    
+    if (format === 'svg') continue;
+
     if (signature.every((byte, index) => buffer[index] === byte)) {
       return true;
     }
   }
-  
-  // Check for SVG
+
   if (signatures.svg) {
     return true;
   }
-  
+
   return false;
 }
 
 function isSvgBuffer(buffer) {
   if (!buffer || buffer.length === 0) return false;
-  
+
   const start = buffer.toString('utf8', 0, Math.min(300, buffer.length));
   const normalized = start.toLowerCase().trim();
-  
-  // More comprehensive SVG detection
-  return normalized.includes('<svg') || 
+
+  return normalized.includes('<svg') ||
          (normalized.includes('<?xml') && (normalized.includes('<svg') || normalized.includes('svg'))) ||
          (normalized.startsWith('<?xml') && normalized.includes('svg'));
 }
 
 async function processSvgImage(buffer) {
   try {
-    // Sanitize SVG for security while preserving all quality elements
     const window = new JSDOM('').window;
     let svg = DOMPurify(window).sanitize(buffer.toString('utf8'), {
       USE_PROFILES: { svg: true, svgFilters: true },
@@ -377,7 +306,6 @@ async function processSvgImage(buffer) {
       ALLOW_ATTR: ['d', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width', 'viewBox', 'transform', 'style', 'id', 'class', 'values', 'type', 'gradientUnits', 'x1', 'y1', 'x2', 'y2', 'offset', 'stdDeviation', 'in', 'result']
     });
 
-    // Extract original dimensions
     const viewBox = svg.match(/viewBox=["']([^"']+)["']/);
     const width = svg.match(/width=["']([^"']+)["']/);
     const height = svg.match(/height=["']([^"']+)["']/);
@@ -397,11 +325,9 @@ async function processSvgImage(buffer) {
       if (height) originalHeight = parseFloat(height[1]) || 24;
     }
 
-    // Ensure positive dimensions
     if (originalWidth <= 0) originalWidth = 24;
     if (originalHeight <= 0) originalHeight = 24;
 
-    // Calculate final dimensions (maintain aspect ratio but target reasonable size for badge fit)
     const aspectRatio = originalWidth / originalHeight;
     const targetHeight = 16;
     let targetWidth;
@@ -412,7 +338,6 @@ async function processSvgImage(buffer) {
       targetWidth = Math.round(targetHeight * aspectRatio);
     }
 
-    // Create ultra-high-quality SVG - preserve original aspect ratio
     let enhancedSvg = svg
       .replace(/<svg[^>]*>/i, (match) => {
 
@@ -422,7 +347,6 @@ async function processSvgImage(buffer) {
 
         attrs = attrs.replace(/\s*(width|height|viewBox)="[^"]*"/gi, '');
 
-        // Add quality rendering attributes and dimensions
         const qualityAttrs = [
           'shape-rendering="geometricPrecision"',
           'text-rendering="optimizeLegibility"',
@@ -450,12 +374,9 @@ async function processPixelImage(buffer, iconColor) {
       return null;
     }
 
-    // Get image metadata
     const metadata = await sharp(buffer).metadata();
-    console.log('Processing raster image:', metadata.format, `${metadata.width}x${metadata.height}`);
 
-    // Use ultra-high working resolution for quality
-    const workingSize = 512; // Much higher resolution for crisp results
+    const workingSize = 512;
     const aspectRatio = metadata.width / metadata.height;
     let workingWidth = workingSize;
     let workingHeight = workingSize;
@@ -466,15 +387,13 @@ async function processPixelImage(buffer, iconColor) {
       workingWidth = Math.round(workingSize * aspectRatio);
     }
 
-    // Ensure minimum working size for quality
     workingWidth = Math.max(workingWidth, 256);
     workingHeight = Math.max(workingHeight, 256);
 
-    // Process with ultra-high quality settings
     const processedBuffer = await sharp(buffer)
       .resize(workingWidth, workingHeight, {
         fit: 'inside',
-        withoutEnlargement: true, // Don't enlarge small images
+        withoutEnlargement: true,
         kernel: 'lanczos3',
         fastShrinkOnLoad: false
       })
@@ -487,59 +406,49 @@ async function processPixelImage(buffer, iconColor) {
       })
       .toBuffer();
 
-    // Calculate final display size (set to 16px height for badge fit, but allow some flexibility)
     const displayHeight = 16;
     const displayWidth = Math.round(displayHeight * aspectRatio);
-    
-    // Cap width to prevent overflow but allow reasonable width for logos
+
     let finalWidth = displayWidth;
     let finalHeight = displayHeight;
 
     if (iconColor) {
-      // Apply black filter to high-res PNG for tracing
       const blackPngBuffer = await sharp(processedBuffer)
         .greyscale()
-        .threshold(128) // Convert to pure black and white
+        .threshold(128)
         .png()
         .toBuffer();
 
-      // Trace to vector SVG using potrace with high accuracy settings
       const vectorSvgString = await new Promise((resolve, reject) => {
         potrace.trace(blackPngBuffer, {
-          threshold: 128,      // Already thresholded, but potrace still needs this
-          turdSize: 1,         // Keep even tiny details
-          optTolerance: 0.01,  // Extremely low tolerance for maximum accuracy
-          alphaMax: 1.0,       // Full opacity
-          optCurve: false,     // Disable curve optimization for accuracy
-          color: 'black',      // Output color
-          background: 'transparent' // Transparent background
+          threshold: 128,
+          turdSize: 1,
+          optTolerance: 0.01,
+          alphaMax: 1.0,
+          optCurve: false,
+          color: 'black',
+          background: 'transparent'
         }, (err, svg) => {
           if (err) reject(err);
           else resolve(svg);
         });
       });
 
-      // Scale the traced SVG to final display size
       let scaledSvg = vectorSvgString;
-      
-      // Update width and height to final display size while keeping the high-res viewBox for accuracy
+
       scaledSvg = scaledSvg.replace(
         /<svg([^>]*)width="[^"]*"([^>]*)height="[^"]*"([^>]*)>/,
         `<svg$1width="${finalWidth}"$2height="${finalHeight}"$3>`
       );
-      
-      // If no width/height in attributes, add them
+
       if (!scaledSvg.includes('width=')) {
         scaledSvg = scaledSvg.replace('<svg', `<svg width="${finalWidth}" height="${finalHeight}"`);
       }
 
-      console.log('Ultra-high-quality raster processing with tracing:', finalWidth, 'x', finalHeight, 'from working size', workingWidth, 'x', workingHeight);
       return { svgString: scaledSvg, width: finalWidth, height: finalHeight };
     } else {
-      // Return embedded PNG SVG
       const base64 = processedBuffer.toString('base64');
 
-      // Create SVG with ultra-high quality settings and proper scaling
       let svg = `<svg width="${finalWidth}" height="${finalHeight}" viewBox="0 0 ${finalWidth} ${finalHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
         <defs>
           <filter id="icon-enhance">
@@ -563,32 +472,22 @@ async function processPixelImage(buffer, iconColor) {
   }
 }
 
-// =============================================================================
-// BADGE GENERATION
-// =============================================================================
-
 function calculateBadgeDimensions(iconData) {
-  // Fixed padding values that don't change based on text length
-  const padding = 12; // Consistent padding on left and right
-  const iconPadding = iconData ? 8 : 0; // Space between icon and text
-  
+  const padding = 12;
+  const iconPadding = iconData ? 8 : 0;
+
   let iconWidth = 0, iconHeight = 0;
   if (iconData) {
-    // Use the processed dimensions, but constrain to fit nicely in badge
-    iconWidth = Math.min(iconData.width, 32); // Max 32px width to prevent overflow
-    iconHeight = Math.min(iconData.height, 20); // Max 20px height to fit in 32px badge
-    
-    // Maintain aspect ratio when constraining
+    iconWidth = Math.min(iconData.width, 32);
+    iconHeight = Math.min(iconData.height, 20);
+
     const originalAspectRatio = iconData.width / iconData.height;
     if (iconWidth < iconData.width) {
-      // Width was constrained, adjust height
       iconHeight = Math.round(iconWidth / originalAspectRatio);
     } else if (iconHeight < iconData.height) {
-      // Height was constrained, adjust width
       iconWidth = Math.round(iconHeight * originalAspectRatio);
     }
-    
-    // Ensure minimum size for visibility
+
     if (iconHeight < 12) {
       iconHeight = 12;
       iconWidth = Math.round(iconHeight * originalAspectRatio);
@@ -596,8 +495,7 @@ function calculateBadgeDimensions(iconData) {
   }
 
   const height = 32;
-  
-  // We'll let CSS handle the width - just calculate positions
+
   return {
     height,
     iconWidth,
@@ -606,24 +504,18 @@ function calculateBadgeDimensions(iconData) {
     iconPadding,
     iconX: padding,
     iconY: Math.round((height - iconHeight - 2) / 2 ),
-    textX: padding + iconWidth + iconPadding, // Start position for text
+    textX: padding + iconWidth + iconPadding,
     textY: Math.round(height / 2 + 4)
   };
 }
 
-function calculateTextWidth(text, fontSize = 12, fontFamily = 'Verdana') {
-  // More accurate text width calculation using character-specific widths for Verdana 12px font-weight 600
+function calculateTextWidth(text, fontSize) {
   const charWidths = {
-    // Narrow characters
     'i': 4, 'l': 4, 'j': 4.5, 't': 5, 'f': 5.5, 'r': 6,
-    // Medium characters
     'a': 7, 'c': 7, 'e': 7, 'n': 7.5, 'o': 7.5, 's': 7, 'u': 7.5, 'v': 7, 'x': 7, 'z': 7,
     'b': 7.5, 'd': 7.5, 'g': 7.5, 'h': 7.5, 'k': 7.5, 'p': 7.5, 'q': 7.5, 'y': 7,
-    // Wide characters
     'm': 11, 'w': 11,
-    // Numbers (generally consistent width)
     '0': 7.5, '1': 5, '2': 7.5, '3': 7.5, '4': 7.5, '5': 7.5, '6': 7.5, '7': 7.5, '8': 7.5, '9': 7.5,
-    // Special characters
     ' ': 4, '.': 4, ',': 4, ':': 4, ';': 4, '!': 4.5, '?': 7.5, '-': 5, '_': 7.5,
     '(': 5, ')': 5, '[': 5, ']': 5, '{': 5.5, '}': 5.5, '/': 5.5, '\\': 5.5, '|': 4,
     '+': 8, '=': 8, '<': 8, '>': 8, '@': 12, '#': 8.5, '$': 7.5, '%': 12, '^': 7,
@@ -634,19 +526,14 @@ function calculateTextWidth(text, fontSize = 12, fontFamily = 'Verdana') {
   for (let char of text) {
     const lowerChar = char.toLowerCase();
     if (charWidths[lowerChar]) {
-      // For uppercase letters, add 10% more width
       const baseWidth = charWidths[lowerChar];
       totalWidth += char === char.toUpperCase() && char !== char.toLowerCase() ? baseWidth * 1.1 : baseWidth;
     } else {
-      // Default width for unknown characters (more generous)
       totalWidth += 8;
     }
   }
 
-  // Add letter spacing (0.1em = 0.1 * fontSize)
   totalWidth += (text.length - 1) * (fontSize * 0.1);
-
-  // Add a safety margin to prevent clipping (20% buffer for better accuracy)
   totalWidth *= 1.2;
 
   return Math.ceil(totalWidth);
@@ -655,7 +542,6 @@ function calculateTextWidth(text, fontSize = 12, fontFamily = 'Verdana') {
 function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
   let finalTextColor;
 
-  // Parse and format the textColor consistently, making it slightly lighter
   const bgParsed = parseColor(bgColor);
   const bgColorFormatted = `rgb(${bgParsed.r}, ${bgParsed.g}, ${bgParsed.b})`;
 
@@ -666,13 +552,13 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
   const fontSize = 11;
   const fontFamily = 'Verdana, system-ui, sans-serif';
 
-  // Calculate exact text width server-side for GitHub compatibility
-  const textWidth = calculateTextWidth(text, fontSize);
+  let textWidth = 0;
+  if (text){
+    textWidth = calculateTextWidth(text, fontSize) + dims.iconPadding ;
+  }
 
-  // Calculate total width with consistent padding
-  const totalWidth = dims.padding + dims.iconWidth + dims.iconPadding + textWidth + dims.padding;
+  const totalWidth = dims.padding + dims.iconWidth + dims.padding + textWidth;
 
-  // Determine corner radius based on edges parameter
   let cornerRadius = '';
   switch (edges.toLowerCase()) {
     case 'rounded':
@@ -689,51 +575,47 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
       break;
   }
 
-  // Generate SVG with exact dimensions (no JavaScript needed)
   const iconSection = iconData ? `
-  <image 
-    href="${iconData.dataUri}" 
-    x="${dims.iconX}" 
-    y="${dims.iconY}" 
-    width="${dims.iconWidth}" 
-    height="${dims.iconHeight}" 
+  <image
+    href="${iconData.dataUri}"
+    x="${dims.iconX}"
+    y="${dims.iconY}"
+    width="${dims.iconWidth}"
+    height="${dims.iconHeight}"
     style="image-rendering: optimizeQuality;"/>
     `: '';
 
   return `
-    <svg 
-      fill="white" 
-      width="${totalWidth}" 
-      height="${dims.height}" 
-      viewBox="0 0 ${totalWidth} ${dims.height}" 
-      xmlns="http://www.w3.org/2000/svg" 
-      shape-rendering="geometricPrecision" 
-      text-rendering="optimizeLegibility" 
-      image-rendering="optimizeQuality" 
+    <svg
+      fill="white"
+      width="${totalWidth}"
+      height="${dims.height}"
+      viewBox="0 0 ${totalWidth} ${dims.height}"
+      xmlns="http://www.w3.org/2000/svg"
+      shape-rendering="geometricPrecision"
+      text-rendering="optimizeLegibility"
+      image-rendering="optimizeQuality"
       color-rendering="optimizeQuality">
-    <rect 
-      width="${totalWidth}" 
-      height="${dims.height}" 
-      fill="${bgColorFormatted}" 
+    <rect
+      width="${totalWidth}"
+      height="${dims.height}"
+      fill="${bgColorFormatted}"
       ${cornerRadius}/>
     ${iconSection}
-    <text 
-      x="${dims.padding + dims.iconWidth + dims.iconPadding}" 
-      y="${dims.height / 2}" 
-      text-anchor="start" 
-      dominant-baseline="middle" 
-      fill="${finalTextColor}" 
-      font-size="${fontSize}" 
-      font-weight="600" 
-      font-family="${fontFamily}" 
-      style="text-rendering: optimizeLegibility; 
-      letter-spacing: 0.2em;">${text}</text>
+
+    ${text !== null && text !== undefined ? `<text
+      x="${dims.padding + dims.iconWidth + dims.iconPadding}"
+      y="${dims.height / 2}"
+      text-anchor="start"
+      dominant-baseline="middle"
+      fill="${finalTextColor}"
+      font-size="${fontSize}"
+      font-weight="600"
+      font-family="${fontFamily}"
+      style="text-rendering: optimizeLegibility;
+      letter-spacing: 0.2em;">${text}</text>` : ''}
   </svg>`;
 }
-
-// =============================================================================
-// ROUTES
-// =============================================================================
 
 app.get('/badge', async (req, res) => {
   const {
@@ -744,11 +626,10 @@ app.get('/badge', async (req, res) => {
     textColor = 'white',
     edges = 'squared'
   } = req.query;
-  
-  const iconData = await processIcon(icon, iconColor);
+
+  const iconData = await generateIcon(icon, iconColor);
   const svg = generateBadgeSvg(text, bgColor, iconData, textColor, edges);
 
-  // Send response
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.send(svg);
