@@ -379,8 +379,6 @@
 <body class="markdown-body">
   <h1>EZ Badges</h1>
 
-  <p>A dynamic SVG badge generator with perfect GitHub README integration.</p>
-
   <h2>Interactive Badge Builder</h2>
 
   <p>Experiment with different parameters and see your badge in real-time:</p>
@@ -549,66 +547,41 @@
     </tbody>
   </table>
 
-  <h2>Icon Libraries</h2>
+  <h3>How It Works</h3>
 
-  <p>Use icons from popular libraries by specifying <code>provider:icon-name</code> format:</p>
+  <p>The server automatically fetches icons from their respective CDNs, processes them for optimal quality, and embeds them directly into your badges:</p>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Provider</th>
-        <th>Description</th>
-        <th>Example</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><code>fontawesome-solid</code></td>
-        <td>FontAwesome Solid Icons</td>
-        <td><code>fontawesome-solid:star</code></td>
-      </tr>
-      <tr>
-        <td><code>fontawesome-regular</code></td>
-        <td>FontAwesome Regular Icons</td>
-        <td><code>fontawesome-regular:star</code></td>
-      </tr>
-      <tr>
-        <td><code>fontawesome-brands</code></td>
-        <td>FontAwesome Brand Icons</td>
-        <td><code>fontawesome-brands:github</code></td>
-      </tr>
-      <tr>
-        <td><code>bootstrap</code></td>
-        <td>Bootstrap Icons</td>
-        <td><code>bootstrap:star</code></td>
-      </tr>
-      <tr>
-        <td><code>heroicons-outline</code></td>
-        <td>Heroicons Outline</td>
-        <td><code>heroicons-outline:star</code></td>
-      </tr>
-      <tr>
-        <td><code>heroicons-solid</code></td>
-        <td>Heroicons Solid</td>
-        <td><code>heroicons-solid:star</code></td>
-      </tr>
-      <tr>
-        <td><code>lucide</code></td>
-        <td>Lucide Icons</td>
-        <td><code>lucide:star</code></td>
-      </tr>
-      <tr>
-        <td><code>tabler</code></td>
-        <td>Tabler Icons</td>
-        <td><code>tabler:star</code></td>
-      </tr>
-      <tr>
-        <td><code>simple-icons</code></td>
-        <td>Simple Icons (brands)</td>
-        <td><code>simple-icons:github</code></td>
-      </tr>
-    </tbody>
-  </table>
+  <ul>
+    <li><strong>Library Icons:</strong> Use <code>fontawesome-solid:star</code> or <code>bootstrap:heart</code></li>
+    <li><strong>Custom URLs:</strong> Use direct image URLs like <code>https://example.com/icon.svg</code></li>
+    <li><strong>Color Customization:</strong> Add <code>&iconColor=red</code> to tint any icon</li>
+    <li><strong>Quality Processing:</strong> SVG icons preserve vector quality, raster images get enhanced with sharpening and optimization</li>
+  </ul>
+
+  <div class="example-grid">
+    <div class="example-card">
+      <h4>FontAwesome</h4>
+      <div class="badge-display">
+        <img src="https://badges.0xleo.dev/badge?text=GitHub&bgColor=black&textColor=white&icon=fontawesome-brands:github" alt="GitHub">
+        <img src="https://badges.0xleo.dev/badge?text=Heart&bgColor=red&icon=fontawesome-solid:heart&iconColor=white" alt="Heart">
+      </div>
+    </div>
+
+    <div class="example-card">
+      <h4>Bootstrap</h4>
+      <div class="badge-display">
+        <img src="https://badges.0xleo.dev/badge?text=Success&bgColor=green&icon=bootstrap:check-circle&iconColor=white" alt="Success">
+        <img src="https://badges.0xleo.dev/badge?text=Warning&bgColor=yellow&icon=bootstrap:exclamation-triangle" alt="Warning">
+      </div>
+    </div>
+
+    <div class="example-card">
+      <h4>Custom Icons</h4>
+      <div class="badge-display">
+        <img src="https://badges.0xleo.dev/badge?text=React&bgColor=#61dafb&icon=https://cdn.jsdelivr.net/npm/simple-icons@v10/icons/react.svg" alt="React">
+      </div>
+    </div>
+  </div>
 
   <h2>Supported Colors</h2>
 

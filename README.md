@@ -2,10 +2,10 @@
 
 A modern, dynamic SVG badge generator with perfect GitHub README integration. Generate beautiful, scalable badges with custom text, colors, icons, and edge styles.
 
-[![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&bgColor=white&textColor=black&icon=https://cdn.iconscout.com/icon/free/png-512/free-javascript-icon-svg-download-png-225993.png?f=webp&w=512)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![Node.js](https://badges.0xleo.dev/badge?text=Node.js&bgColor=black&icon=https://nodejs.org/static/images/logo.svg)](https://nodejs.org)
-[![Express](https://badges.0xleo.dev/badge?text=Express&bgColor=white&textColor=black&icon=https://icon.icepanel.io/Technology/png-shadow-512/Express.png)](https://expressjs.com)
-[![Sharp](https://badges.0xleo.dev/badge?text=Sharp&bgColor=black&icon=https://sharp.pixelplumbing.com/_astro/sharp-logo.CiVIswaO.svg)](https://sharp.pixelplumbing.com)
+[![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&bgColor=amber&edges=squared&textColor=white&icon=simple-icons:javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Node.js](https://badges.0xleo.dev/badge?text=NodeJS&bgColor=green&edges=squared&textColor=white&icon=simple-icons:nodedotjs)](https://nodejs.org)
+[![Express](https://badges.0xleo.dev/badge?text=Express&bgColor=white&textColor=black&iconColor=black&icon=simple-icons:express)](https://expressjs.com)
+[![Sharp](https://badges.0xleo.dev/badge?text=Sharp&bgColor=olive&icon=simple-icons:sharp)](https://sharp.pixelplumbing.com)
 
 ## Quick Start
 
