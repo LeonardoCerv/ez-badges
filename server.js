@@ -67,6 +67,33 @@ const COLORS = {
   terracotta:    { r: 204, g: 78, b: 92 }
 };
 
+// =============================================================================
+// ICON PROVIDERS
+// =============================================================================
+
+const ICON_PROVIDERS = {
+  // FontAwesome
+  'fontawesome-solid': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/solid/{icon}.svg',
+  'fontawesome-regular': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/regular/{icon}.svg',
+  'fontawesome-brands': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/brands/{icon}.svg',
+  
+  // Bootstrap Icons
+  'bootstrap': 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/icons/{icon}.svg',
+  
+  // Heroicons
+  'heroicons-outline': 'https://unpkg.com/heroicons@2.0.18/24/outline/{icon}.svg',
+  'heroicons-solid': 'https://unpkg.com/heroicons@2.0.18/24/solid/{icon}.svg',
+  
+  // Lucide Icons
+  'lucide': 'https://unpkg.com/lucide-static@latest/icons/{icon}.svg',
+  
+  // Tabler Icons
+  'tabler': 'https://unpkg.com/@tabler/icons@latest/icons/{icon}.svg',
+  
+  // Simple Icons (brands)
+  'simple-icons': 'https://cdn.jsdelivr.net/npm/simple-icons@v10/icons/{icon}.svg'
+};
+
 function parseColor(color) {
   if (typeof color !== 'string') {
     return COLORS.white;
@@ -233,7 +260,6 @@ function enhanceColorProcessing(svgString, targetColor) {
     // Preserve special values
     if (normalizedValue === 'none' ||
         normalizedValue === 'transparent' ||
-        normalizedValue === 'currentcolor' ||
         normalizedValue.startsWith('url(') ||
         normalizedValue.includes('gradient')) {
       return match;
@@ -246,7 +272,6 @@ function enhanceColorProcessing(svgString, targetColor) {
     const normalizedValue = value.trim().toLowerCase();
     if (normalizedValue === 'none' ||
         normalizedValue === 'transparent' ||
-        normalizedValue === 'currentcolor' ||
         normalizedValue.startsWith('url(') ||
         normalizedValue.includes('gradient')) {
       return match;
@@ -259,7 +284,6 @@ function enhanceColorProcessing(svgString, targetColor) {
     const normalizedColor = color.trim().toLowerCase();
     if (normalizedColor === 'none' ||
         normalizedColor === 'transparent' ||
-        normalizedColor === 'currentcolor' ||
         normalizedColor.startsWith('url(') ||
         normalizedColor.includes('gradient')) {
       return match;
@@ -267,12 +291,29 @@ function enhanceColorProcessing(svgString, targetColor) {
     return `style="${before}fill: ${finalColor}${after}"`;
   });
 
+  // Add default fill to path elements that don't have fill
+  enhanced = enhanced.replace(/(<path[^>]*?)(>)/gi, (match, tag, close) => {
+    if (!tag.includes('fill=')) {
+      return tag + ` fill="${finalColor}"` + close;
+    }
+    return match;
+  });
+
+  // Add default fill to other common SVG elements
+  ['circle', 'rect', 'ellipse', 'polygon', 'polyline'].forEach(element => {
+    enhanced = enhanced.replace(new RegExp(`(<${element}[^>]*?)(>)`, 'gi'), (match, tag, close) => {
+      if (!tag.includes('fill=')) {
+        return tag + ` fill="${finalColor}"` + close;
+      }
+      return match;
+    });
+  });
+
   // Replace stroke in style attributes
   enhanced = enhanced.replace(/style="([^"]*?)stroke:\s*([^;"]+)([^"]*?)"/gi, (match, before, color, after) => {
     const normalizedColor = color.trim().toLowerCase();
     if (normalizedColor === 'none' ||
         normalizedColor === 'transparent' ||
-        normalizedColor === 'currentcolor' ||
         normalizedColor.startsWith('url(') ||
         normalizedColor.includes('gradient')) {
       return match;
@@ -284,8 +325,46 @@ function enhanceColorProcessing(svgString, targetColor) {
 }
 
 // =============================================================================
-// IMAGE PROCESSING
+// ICON PROCESSING
 // =============================================================================
+
+function resolveIconUrl(iconParam) {
+  if (!iconParam) return null;
+  
+  // Check if it's a provider:icon format
+  const colonIndex = iconParam.indexOf(':');
+  if (colonIndex > 0) {
+    const provider = iconParam.substring(0, colonIndex);
+    const iconName = iconParam.substring(colonIndex + 1);
+    
+    const template = ICON_PROVIDERS[provider];
+    if (template) {
+      return template.replace('{icon}', iconName);
+    }
+  }
+  
+  // Otherwise, treat as direct URL
+  return iconParam;
+}
+
+async function processIcon(iconParam, iconColor) {
+  const url = resolveIconUrl(iconParam);
+  if (!url) return null;
+
+  // Fetch and process image
+  const buffer = await fetchImage(url);
+  if (!buffer) return null;
+
+  let result;
+  if (isSvgBuffer(buffer)) {
+    result = await processSvgImage(buffer, iconColor);
+  } else {
+    // Convert raster images to true vector paths
+    result = await processPixelImage(buffer, iconColor);
+  }
+
+  return result;
+}
 
 async function fetchImage(url) {
   try {
@@ -421,6 +500,32 @@ async function processSvgImage(buffer, iconColor) {
       if (heightMatch) originalHeight = parseFloat(heightMatch[1]) || 24;
     }
 
+    // Ensure positive dimensions
+    if (originalWidth <= 0) originalWidth = 24;
+    if (originalHeight <= 0) originalHeight = 24;
+
+    // Calculate final dimensions (maintain aspect ratio but target reasonable size for badge fit)
+    const aspectRatio = originalWidth / originalHeight;
+    let targetHeight = 16;
+    let targetWidth;
+
+    if (isNaN(aspectRatio) || !isFinite(aspectRatio)) {
+      targetWidth = 16;
+    } else {
+      targetWidth = Math.round(targetHeight * aspectRatio);
+      // For brand logos like Simple Icons, allow reasonable width but cap at badge-friendly size
+      const maxWidth = 40; // Allow wider logos to show properly
+      if (targetWidth > maxWidth) {
+        targetWidth = maxWidth;
+        targetHeight = Math.round(maxWidth / aspectRatio);
+        // Ensure minimum height for visibility
+        if (targetHeight < 12) {
+          targetHeight = 12;
+          targetWidth = Math.round(targetHeight * aspectRatio);
+        }
+      }
+    }
+
     // Apply color processing if needed - but preserve SVG nature
     if (iconColor) {
       cleanSvg = enhanceColorProcessing(cleanSvg, iconColor);
@@ -429,33 +534,29 @@ async function processSvgImage(buffer, iconColor) {
     // Remove any existing xmlns declarations to avoid conflicts
     cleanSvg = cleanSvg.replace(/\s*xmlns[^=]*="[^"]*"/g, '');
 
-    // Create ultra-high-quality SVG - this stays as pure vector
+    // Create ultra-high-quality SVG - preserve original aspect ratio
     let enhancedSvg = cleanSvg
       .replace(/<svg[^>]*>/i, (match) => {
         // Extract existing attributes
         let attrs = match.replace(/<svg\s*/i, '').replace(/>\s*$/, '');
 
-        // Add quality rendering attributes
+        // Remove existing width, height, viewBox to replace them
+        attrs = attrs.replace(/\s*(width|height|viewBox)="[^"]*"/gi, '');
+
+        // Add quality rendering attributes and dimensions
         const qualityAttrs = [
           'shape-rendering="geometricPrecision"',
           'text-rendering="optimizeLegibility"',
           'image-rendering="optimizeQuality"',
           'color-rendering="optimizeQuality"',
+          `width="${targetWidth}"`,
+          `height="${targetHeight}"`,
+          `viewBox="${viewBoxX} ${viewBoxY} ${originalWidth} ${originalHeight}"`,
           'xmlns="http://www.w3.org/2000/svg"'
         ].join(' ');
 
         return `<svg ${attrs} ${qualityAttrs}>`;
       });
-
-    // Ensure proper viewBox for scaling
-    if (!enhancedSvg.includes('viewBox')) {
-      enhancedSvg = enhancedSvg.replace('<svg', `<svg viewBox="${viewBoxX} ${viewBoxY} ${originalWidth} ${originalHeight}"`);
-    }
-
-    // Calculate final dimensions (maintain aspect ratio but target 32px height)
-    const aspectRatio = originalWidth / originalHeight;
-    const targetHeight = 32;
-    const targetWidth = Math.round(targetHeight * aspectRatio);
 
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(enhancedSvg).toString('base64')}`;
 
@@ -465,7 +566,9 @@ async function processSvgImage(buffer, iconColor) {
     console.error('SVG processing failed:', error.message);
     return null;
   }
-}async function processPixelImage(buffer, iconColor) {
+}
+
+async function processPixelImage(buffer, iconColor) {
   try {
     if (!isValidImageBuffer(buffer)) {
       return null;
@@ -522,14 +625,29 @@ async function processSvgImage(buffer, iconColor) {
       })
       .toBuffer();
 
-    // Calculate final display size (higher than before for better quality)
-    const displayHeight = 64; // Increased from 32px for much better quality
+    // Calculate final display size (set to 16px height for badge fit, but allow some flexibility)
+    const displayHeight = Math.min(iconData.height, 20); // Allow up to 20px height for better visibility
     const displayWidth = Math.round(displayHeight * aspectRatio);
+    
+    // Cap width to prevent overflow but allow reasonable width for logos
+    const maxDisplayWidth = 28;
+    let finalWidth = displayWidth;
+    let finalHeight = displayHeight;
+    
+    if (displayWidth > maxDisplayWidth) {
+      finalWidth = maxDisplayWidth;
+      finalHeight = Math.round(maxDisplayWidth / aspectRatio);
+      // Ensure minimum height
+      if (finalHeight < 10) {
+        finalHeight = 10;
+        finalWidth = Math.round(finalHeight * aspectRatio);
+      }
+    }
 
     const base64 = processedBuffer.toString('base64');
 
     // Create SVG with ultra-high quality settings and proper scaling
-    let svg = `<svg width="${displayWidth}" height="${displayHeight}" viewBox="0 0 ${displayWidth} ${displayHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+    let svg = `<svg width="${finalWidth}" height="${finalHeight}" viewBox="0 0 ${finalWidth} ${finalHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
       <defs>
         <filter id="icon-enhance">
           <feColorMatrix type="saturate" values="1.1"/>
@@ -540,7 +658,7 @@ async function processSvgImage(buffer, iconColor) {
           </feComponentTransfer>
         </filter>
       </defs>
-      <image href="data:image/png;base64,${base64}" width="${displayWidth}" height="${displayHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
+      <image href="data:image/png;base64,${base64}" width="${finalWidth}" height="${finalHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
     </svg>`;
 
     // Apply color processing to the final SVG if iconColor is specified
@@ -550,32 +668,12 @@ async function processSvgImage(buffer, iconColor) {
 
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 
-    console.log('Ultra-high-quality raster processing:', displayWidth, 'x', displayHeight, 'from working size', workingWidth, 'x', workingHeight);
-    return { dataUri, width: displayWidth, height: displayHeight };
+    console.log('Ultra-high-quality raster processing:', finalWidth, 'x', finalHeight, 'from working size', workingWidth, 'x', workingHeight);
+    return { dataUri, width: finalWidth, height: finalHeight };
   } catch (error) {
     console.error('High-quality raster processing failed:', error.message);
     return null;
   }
-}
-
-// =============================================================================
-// BADGE GENERATION
-// =============================================================================
-
-async function processIcon(url, iconColor) {
-  // Fetch and process image
-  const buffer = await fetchImage(url);
-  if (!buffer) return null;
-
-  let result;
-  if (isSvgBuffer(buffer)) {
-    result = await processSvgImage(buffer, iconColor);
-  } else {
-    // Convert raster images to true vector paths
-    result = await processPixelImage(buffer, iconColor);
-  }
-
-  return result;
 }
 
 // =============================================================================
@@ -589,15 +687,24 @@ function calculateBadgeDimensions(text, iconData) {
   
   let iconWidth = 0, iconHeight = 0;
   if (iconData) {
-    // Compact size for minimal badges
-    const maxHeight = 20;
-    if (iconData.height > maxHeight) {
-      const scale = maxHeight / iconData.height;
-      iconWidth = Math.round(iconData.width * scale);
-      iconHeight = maxHeight;
-    } else {
-      iconWidth = iconData.width;
-      iconHeight = iconData.height;
+    // Use the processed dimensions, but constrain to fit nicely in badge
+    iconWidth = Math.min(iconData.width, 32); // Max 32px width to prevent overflow
+    iconHeight = Math.min(iconData.height, 20); // Max 20px height to fit in 32px badge
+    
+    // Maintain aspect ratio when constraining
+    const originalAspectRatio = iconData.width / iconData.height;
+    if (iconWidth < iconData.width) {
+      // Width was constrained, adjust height
+      iconHeight = Math.round(iconWidth / originalAspectRatio);
+    } else if (iconHeight < iconData.height) {
+      // Height was constrained, adjust width
+      iconWidth = Math.round(iconHeight * originalAspectRatio);
+    }
+    
+    // Ensure minimum size for visibility
+    if (iconHeight < 12) {
+      iconHeight = 12;
+      iconWidth = Math.round(iconHeight * originalAspectRatio);
     }
   }
 
@@ -611,7 +718,7 @@ function calculateBadgeDimensions(text, iconData) {
     padding,
     iconPadding,
     iconX: padding,
-    iconY: Math.round((height - iconHeight) / 2),
+    iconY: Math.round((height - iconHeight) / 2 ),
     textX: padding + iconWidth + iconPadding, // Start position for text
     textY: Math.round(height / 2 + 4)
   };
@@ -649,8 +756,8 @@ function calculateTextWidth(text, fontSize = 12, fontFamily = 'Verdana') {
     }
   }
 
-  // Add letter spacing (0.025em = 0.025 * fontSize)
-  totalWidth += (text.length - 1) * (fontSize * 0.025);
+  // Add letter spacing (0.1em = 0.1 * fontSize)
+  totalWidth += (text.length - 1) * (fontSize * 0.1);
 
   // Add a safety margin to prevent clipping (20% buffer for better accuracy)
   totalWidth *= 1.2;
@@ -673,7 +780,7 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded')
   }
 
   const dims = calculateBadgeDimensions(text, iconData);
-  const fontSize = 12;
+  const fontSize = 11;
   const fontFamily = 'Verdana, system-ui, sans-serif';
 
   // Calculate exact text width server-side for GitHub compatibility
@@ -709,7 +816,7 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges = 'rounded')
   return `<svg width="${totalWidth}" height="${dims.height}" viewBox="0 0 ${totalWidth} ${dims.height}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
     <rect width="${totalWidth}" height="${dims.height}" fill="${bgColor}" ${cornerRadius}/>
     ${iconSection}
-    <text x="${dims.padding + dims.iconWidth + dims.iconPadding}" y="${dims.height / 2}" text-anchor="start" dominant-baseline="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.025em;">${text}</text>
+    <text x="${dims.padding + dims.iconWidth + dims.iconPadding}" y="${dims.height / 2}" text-anchor="start" dominant-baseline="middle" fill="${finalTextColor}" font-size="${fontSize}" font-weight="600" font-family="${fontFamily}" style="text-rendering: optimizeLegibility; letter-spacing: 0.1em;">${text}</text>
   </svg>`;
 }
 
@@ -738,7 +845,9 @@ app.get('/badge', async (req, res) => {
   // Process icon if provided
   let iconData = null;
   if (icon) {
-    iconData = await processIcon(icon, iconColor);
+    // Default icon color to white if not specified
+    const finalIconColor = iconColor || 'white';
+    iconData = await processIcon(icon, finalIconColor);
   }
 
   // Generate SVG badge
