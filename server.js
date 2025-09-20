@@ -1,3 +1,14 @@
+/**
+ * EZ Badges
+ *
+ * A dynamic SVG badge generator inspired by img.shields.io, featuring the ability
+ * to use your own image paths and convert them into SVG badges for your README files.
+ *
+ * Generates customizable badges with icons and text. Handles SVG color changes,
+ * image processing, and serves everything via Express. Built for performance
+ * and security with Sharp, Potrace, and DOMPurify.
+ */
+
 const express = require('express');
 const axios = require('axios');
 const sharp = require('sharp');
@@ -8,6 +19,10 @@ const potrace = require('potrace');
 const app = express();
 const port = process.env.PORT || 3000;
 
+/**
+ * Standard color palette for badges. Keeps things consistent and avoids
+ * user typos with hex codes. RGB values ensure cross-browser reliability.
+ */
 const COLORS = {
   black: { r: 0, g: 0, b: 0 },
   white: { r: 255, g: 255, b: 255 },
@@ -50,6 +65,10 @@ const COLORS = {
   terracotta: { r: 204, g: 78, b: 92 }
 };
 
+/**
+ * Icon sources from popular libraries. Uses CDNs for easy updates,
+ * but cache locally in production. {icon} gets replaced with the icon name.
+ */
 const ICON_PROVIDERS = {
   'fontawesome-solid': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/solid/{icon}.svg',
   'fontawesome-regular': 'https://unpkg.com/@fortawesome/fontawesome-free@6.5.1/svgs/regular/{icon}.svg',
@@ -62,6 +81,12 @@ const ICON_PROVIDERS = {
   'simple-icons': 'https://cdn.jsdelivr.net/npm/simple-icons@v10/icons/{icon}.svg'
 };
 
+/**
+ * Turns color strings into RGB. Handles hex like "FF0000" or names like "red".
+ * Falls back to white if input is garbage - better than breaking the badge.
+ * @param {string} color - Color name or hex
+ * @returns {Object} RGB object
+ */
 function parseColor(color) {
   if (typeof color !== 'string') {
     return COLORS.white;
@@ -78,12 +103,22 @@ function parseColor(color) {
   }
 }
 
+/**
+ * Recolors SVG elements. Handles fills, strokes, styles, and even embedded images.
+ * Skips gradients and transparency to avoid messing up the design.
+ * @param {string} svgString - The SVG markup
+ * @param {string} targetColor - New color
+ * @returns {string} Recolored SVG
+ */
 function changeSvgColor(svgString, targetColor) {
   const rgb = parseColor(targetColor);
   const finalColor = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
   let enhanced = svgString;
 
+  // Handle SVGs with raster images - use filters to colorize without losing detail
   if (enhanced.includes('<image')) {
+    // Custom filter for subtle colorization of images
+    // Matrix applies target RGB while keeping image structure intact
     const subtleFilter = `
         <filter id="subtle-colorize">
           <feComponentTransfer>
@@ -191,6 +226,12 @@ function changeSvgColor(svgString, targetColor) {
   return enhanced;
 }
 
+/**
+ * Builds icon URLs from provider:name format or returns direct URLs.
+ * Easy to extend with new providers.
+ * @param {string} iconParam - Icon identifier
+ * @returns {string} Full URL
+ */
 function resolveIconUrl(iconParam) {
   const colonIndex = iconParam.indexOf(':');
 
@@ -207,6 +248,13 @@ function resolveIconUrl(iconParam) {
   return iconParam;
 }
 
+/**
+ * Fetches and processes an icon into a data URI. Handles SVG and raster images,
+ * applies color if needed. Returns null on failure for graceful handling.
+ * @param {string} iconParam - Icon source
+ * @param {string} iconColor - Optional color
+ * @returns {Object|null} Icon data with URI and dimensions
+ */
 async function generateIcon(iconParam, iconColor) {
   if (!iconParam) return null;
   const url = resolveIconUrl(iconParam);
@@ -231,6 +279,12 @@ async function generateIcon(iconParam, iconColor) {
   return { dataUri, width: result.width, height: result.height };
 }
 
+/**
+ * Downloads an image with safety checks. Times out to avoid hanging,
+ * limits size to prevent abuse, and uses proper headers for compatibility.
+ * @param {string} url - Image URL
+ * @returns {Buffer|null} Image data or null
+ */
 async function fetchImage(url) {
   try {
     const response = await axios.get(url, {
@@ -253,6 +307,12 @@ async function fetchImage(url) {
   }
 }
 
+/**
+ * Checks if buffer is actually an image. Rejects HTML error pages and
+ * verifies file signatures for supported formats.
+ * @param {Buffer} buffer - Data to check
+ * @returns {boolean} True if valid image
+ */
 function isValidImageBuffer(buffer) {
   if (!buffer || buffer.length === 0) return false;
 
@@ -286,6 +346,12 @@ function isValidImageBuffer(buffer) {
   return false;
 }
 
+/**
+ * Detects SVG content by looking for tags and XML headers.
+ * Better than trusting file extensions from URLs.
+ * @param {Buffer} buffer - Data to check
+ * @returns {boolean} True if SVG
+ */
 function isSvgBuffer(buffer) {
   if (!buffer || buffer.length === 0) return false;
 
@@ -297,9 +363,16 @@ function isSvgBuffer(buffer) {
          (normalized.startsWith('<?xml') && normalized.includes('svg'));
 }
 
+/**
+ * Cleans and resizes SVG icons. Sanitizes to block XSS, extracts dimensions,
+ * and scales to fit badge size while keeping aspect ratio.
+ * @param {Buffer} buffer - SVG data
+ * @returns {Object|null} Processed SVG info
+ */
 async function processSvgImage(buffer) {
   try {
     const window = new JSDOM('').window;
+    // Sanitize to prevent XSS from sketchy icon sources
     let svg = DOMPurify(window).sanitize(buffer.toString('utf8'), {
       USE_PROFILES: { svg: true, svgFilters: true },
       ALLOW_TAGS: ['svg', 'path', 'circle', 'rect', 'ellipse', 'line', 'polygon', 'polyline', 'g', 'defs', 'clipPath', 'mask', 'linearGradient', 'radialGradient', 'stop', 'filter', 'feColorMatrix', 'feGaussianBlur', 'feOffset', 'feMerge', 'feMergeNode'],
@@ -368,6 +441,13 @@ async function processSvgImage(buffer) {
   }
 }
 
+/**
+ * Turns raster images into crisp SVG icons. Uses Sharp for resizing,
+ * Potrace for vectorizing when coloring. Adds quality filters.
+ * @param {Buffer} buffer - Image data
+ * @param {string} iconColor - Color for vectorization
+ * @returns {Object|null} Processed icon
+ */
 async function processPixelImage(buffer, iconColor) {
   try {
     if (!isValidImageBuffer(buffer)) {
@@ -376,6 +456,7 @@ async function processPixelImage(buffer, iconColor) {
 
     const metadata = await sharp(buffer).metadata();
 
+    // Work at high res for quality, but don't go overboard
     const workingSize = 512;
     const aspectRatio = metadata.width / metadata.height;
     let workingWidth = workingSize;
@@ -472,6 +553,12 @@ async function processPixelImage(buffer, iconColor) {
   }
 }
 
+/**
+ * Figures out spacing and sizing for badge elements. Keeps icons proportional,
+ * positions text nicely, handles cases with/without icons.
+ * @param {Object} iconData - Icon dimensions or null
+ * @returns {Object} Layout calculations
+ */
 function calculateBadgeDimensions(iconData) {
   const padding = 12;
   const iconPadding = iconData ? 8 : 0;
@@ -509,6 +596,13 @@ function calculateBadgeDimensions(iconData) {
   };
 }
 
+/**
+ * Estimates text width for layout. Uses character widths since measuring
+ * fonts in Node is a pain. Good enough for badges.
+ * @param {string} text - Text to measure
+ * @param {number} fontSize - Font size
+ * @returns {number} Approximate width
+ */
 function calculateTextWidth(text, fontSize) {
   const charWidths = {
     'i': 4, 'l': 4, 'j': 4.5, 't': 5, 'f': 5.5, 'r': 6,
@@ -539,6 +633,16 @@ function calculateTextWidth(text, fontSize) {
   return Math.ceil(totalWidth);
 }
 
+/**
+ * Builds the final SVG badge. Parses colors, calculates layout,
+ * handles different edge styles (rounded, square, pill).
+ * @param {string} text - Badge text
+ * @param {string} bgColor - Background color
+ * @param {Object} iconData - Processed icon
+ * @param {string} textColor - Text color
+ * @param {string} edges - Corner style
+ * @returns {string} Complete SVG
+ */
 function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
   let finalTextColor;
 
@@ -617,6 +721,10 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
   </svg>`;
 }
 
+/**
+ * Main endpoint for generating badges. Takes query params for text, icon,
+ * colors, etc. Processes icons async and caches the result.
+ */
 app.get('/badge', async (req, res) => {
   const {
     text,
@@ -635,14 +743,23 @@ app.get('/badge', async (req, res) => {
   res.send(svg);
 });
 
+/**
+ * Serves the main app page with the badge builder UI.
+ */
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
+/**
+ * Terms page - covers usage and legal stuff.
+ */
 app.get('/terms', (req, res) => {
   res.sendFile(__dirname + '/terms.html');
 });
 
+/**
+ * Fire up the server. Logs the port for easy debugging.
+ */
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

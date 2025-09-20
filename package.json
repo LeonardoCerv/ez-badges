@@ -1,7 +1,7 @@
 {
   "name": "ez-badges",
   "version": "1.0.0",
-  "description": "Dynamic SVG badge generator with external logos",
+  "description": "A dynamic SVG badge generator inspired by img.shields.io, featuring the ability to use your own image paths and convert them into SVG badges for your README files.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

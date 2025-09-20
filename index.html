@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EZ Badges - Dynamic SVG Badge Generator</title>
+  <title>EZ Badges - A dynamic SVG badge generator inspired by img.shields.io, featuring the ability to use your own image paths and convert them into SVG badges for your README files.</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -467,7 +467,7 @@
       </tr>
       <tr>
         <td><code>iconColor</code></td>
-        <td>Icon color tint</td>
+        <td>Icon color tint (works best with library icons)</td>
         <td><code>null</code></td>
         <td><code>iconColor=red</code></td>
       </tr>
@@ -552,9 +552,9 @@
   <p>The server automatically fetches icons from their respective CDNs, processes them for optimal quality, and embeds them directly into your badges:</p>
 
   <ul>
-    <li><strong>Library Icons:</strong> Use <code>fontawesome-solid:star</code> or <code>bootstrap:heart</code></li>
-    <li><strong>Custom URLs:</strong> Use direct image URLs like <code>https://example.com/icon.svg</code></li>
-    <li><strong>Color Customization:</strong> Add <code>&iconColor=red</code> to tint any icon</li>
+    <li><strong>Library Icons:</strong> Use <code>fontawesome-solid:star</code> or <code>bootstrap:heart</code> - full color customization support</li>
+    <li><strong>Custom URLs:</strong> Use direct image URLs like <code>https://example.com/icon.svg</code> - iconColor may not work for all images</li>
+    <li><strong>Color Customization:</strong> Add <code>&iconColor=red</code> to tint library icons (may not work with custom images)</li>
     <li><strong>Quality Processing:</strong> SVG icons preserve vector quality, raster images get enhanced with sharpening and optimization</li>
   </ul>
 

@@ -1,6 +1,8 @@
 # EZ Badges
 
-A modern, dynamic SVG badge generator with perfect GitHub README integration. Generate beautiful, scalable badges with custom text, colors, icons, and edge styles.
+A dynamic SVG badge generator inspired by img.shields.io, featuring the ability to use your own image paths and convert them into SVG badges for your README files.
+
+**Note:** The `iconColor` parameter works reliably with supported icon libraries but may have limitations with custom image paths.
 
 [![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&bgColor=amber&edges=squared&textColor=white&icon=simple-icons:javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Node.js](https://badges.0xleo.dev/badge?text=NodeJS&bgColor=green&edges=squared&textColor=white&icon=simple-icons:nodedotjs)](https://nodejs.org)
