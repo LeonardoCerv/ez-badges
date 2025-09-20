@@ -3,6 +3,7 @@ const axios = require('axios');
 const sharp = require('sharp');
 const DOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
+const potrace = require('potrace');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -276,26 +277,23 @@ async function processIcon(iconParam, iconColor) {
   const buffer = await fetchImage(url);
   if (!buffer) return null;
 
-  let svg;
+  let result;
   if (isSvgBuffer(buffer)) {
-    svg = await processSvgImage(buffer);
+    result = await processSvgImage(buffer);
   } else {
-    // Convert raster images to true vector paths
-    svg = await processPixelImage(buffer);
+    result = await processPixelImage(buffer, iconColor);
   }
 
-  // change svg color
+  if (!result) return null;
+
+  // Apply color processing if iconColor is specified
   if (iconColor) {
-    const base64 = svg.dataUri.replace('data:image/svg+xml;base64,', '');
-    const svgString = Buffer.from(base64, 'base64').toString('utf8');
-
-    const enhancedSvg = enhanceColorProcessing(svgString, iconColor);
-
-    const newBase64 = Buffer.from(enhancedSvg).toString('base64');
-    svg.dataUri = `data:image/svg+xml;base64,${newBase64}`;
+    result.svgString = enhanceColorProcessing(result.svgString, iconColor);
   }
 
-  return svg;
+  // Encode to data URI
+  const dataUri = `data:image/svg+xml;base64,${Buffer.from(result.svgString).toString('base64')}`;
+  return { dataUri, width: result.width, height: result.height };
 }
 
 async function fetchImage(url) {
@@ -439,15 +437,14 @@ async function processSvgImage(buffer) {
         return `<svg ${attrs} ${qualityAttrs}>`;
       });
 
-    const dataUri = `data:image/svg+xml;base64,${Buffer.from(enhancedSvg).toString('base64')}`;
-    return { dataUri, width: targetWidth, height: targetHeight };
+    return { svgString: enhancedSvg, width: targetWidth, height: targetHeight };
   } catch (error) {
     console.error('SVG processing failed:', error.message);
     return null;
   }
 }
 
-async function processPixelImage(buffer) {
+async function processPixelImage(buffer, iconColor) {
   try {
     if (!isValidImageBuffer(buffer)) {
       return null;
@@ -498,27 +495,68 @@ async function processPixelImage(buffer) {
     let finalWidth = displayWidth;
     let finalHeight = displayHeight;
 
-    const base64 = processedBuffer.toString('base64');
+    if (iconColor) {
+      // Apply black filter to high-res PNG for tracing
+      const blackPngBuffer = await sharp(processedBuffer)
+        .greyscale()
+        .threshold(128) // Convert to pure black and white
+        .png()
+        .toBuffer();
 
-    // Create SVG with ultra-high quality settings and proper scaling
-    let svg = `<svg width="${finalWidth}" height="${finalHeight}" viewBox="0 0 ${finalWidth} ${finalHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
-      <defs>
-        <filter id="icon-enhance">
-          <feColorMatrix type="saturate" values="1.0"/>
-          <feComponentTransfer>
-            <feFuncR type="gamma" amplitude="1" exponent="1.0"/>
-            <feFuncG type="gamma" amplitude="1" exponent="1.0"/>
-            <feFuncB type="gamma" amplitude="1" exponent="1.0"/>
-          </feComponentTransfer>
-        </filter>
-      </defs>
-      <image href="data:image/png;base64,${base64}" width="${finalWidth}" height="${finalHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
-    </svg>`;
+      // Trace to vector SVG using potrace with high accuracy settings
+      const vectorSvgString = await new Promise((resolve, reject) => {
+        potrace.trace(blackPngBuffer, {
+          threshold: 128,      // Already thresholded, but potrace still needs this
+          turdSize: 1,         // Keep even tiny details
+          optTolerance: 0.01,  // Extremely low tolerance for maximum accuracy
+          alphaMax: 1.0,       // Full opacity
+          optCurve: false,     // Disable curve optimization for accuracy
+          color: 'black',      // Output color
+          background: 'transparent' // Transparent background
+        }, (err, svg) => {
+          if (err) reject(err);
+          else resolve(svg);
+        });
+      });
 
-    const dataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+      // Scale the traced SVG to final display size
+      let scaledSvg = vectorSvgString;
+      
+      // Update width and height to final display size while keeping the high-res viewBox for accuracy
+      scaledSvg = scaledSvg.replace(
+        /<svg([^>]*)width="[^"]*"([^>]*)height="[^"]*"([^>]*)>/,
+        `<svg$1width="${finalWidth}"$2height="${finalHeight}"$3>`
+      );
+      
+      // If no width/height in attributes, add them
+      if (!scaledSvg.includes('width=')) {
+        scaledSvg = scaledSvg.replace('<svg', `<svg width="${finalWidth}" height="${finalHeight}"`);
+      }
 
-    console.log('Ultra-high-quality raster processing:', finalWidth, 'x', finalHeight, 'from working size', workingWidth, 'x', workingHeight);
-    return { dataUri, width: finalWidth, height: finalHeight };
+      console.log('Ultra-high-quality raster processing with tracing:', finalWidth, 'x', finalHeight, 'from working size', workingWidth, 'x', workingHeight);
+      return { svgString: scaledSvg, width: finalWidth, height: finalHeight };
+    } else {
+      // Return embedded PNG SVG
+      const base64 = processedBuffer.toString('base64');
+
+      // Create SVG with ultra-high quality settings and proper scaling
+      let svg = `<svg width="${finalWidth}" height="${finalHeight}" viewBox="0 0 ${finalWidth} ${finalHeight}" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" image-rendering="optimizeQuality" color-rendering="optimizeQuality">
+        <defs>
+          <filter id="icon-enhance">
+            <feColorMatrix type="saturate" values="1.0"/>
+            <feComponentTransfer>
+              <feFuncR type="gamma" amplitude="1" exponent="1.0"/>
+              <feFuncG type="gamma" amplitude="1" exponent="1.0"/>
+              <feFuncB type="gamma" amplitude="1" exponent="1.0"/>
+            </feComponentTransfer>
+          </filter>
+        </defs>
+        <image href="data:image/png;base64,${base64}" width="${finalWidth}" height="${finalHeight}" filter="url(#icon-enhance)" style="image-rendering: -webkit-optimize-contrast; image-rendering: optimizeQuality;"/>
+      </svg>`;
+
+      console.log('Ultra-high-quality raster processing:', finalWidth, 'x', finalHeight, 'from working size', workingWidth, 'x', workingHeight);
+      return { svgString: svg, width: finalWidth, height: finalHeight };
+    }
   } catch (error) {
     console.error('High-quality raster processing failed:', error.message);
     return null;
