@@ -16,14 +16,14 @@ let redisStorageAvailable = false;
 
 // Initialize Redis client if Upstash environment variables are set
 try {
-  // Check for Vercel KV environment variables first (preferred for Vercel deployments)
-  let redisUrl = process.env.KV_REST_API_URL;
-  let redisToken = process.env.KV_REST_API_TOKEN;
+  // Check for direct Upstash variables first (most reliable)
+  let redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  let redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
   
-  // Fallback to direct Upstash variables if Vercel KV not found
+  // Fallback to Vercel KV environment variables
   if (!redisUrl || !redisToken) {
-    redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-    redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    redisUrl = process.env.KV_REST_API_URL;
+    redisToken = process.env.KV_REST_API_TOKEN;
   }
   
   if (redisUrl && redisToken) {
