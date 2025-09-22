@@ -4,11 +4,22 @@ const path = require('path');
 const { generateIcon } = require('../utils/iconUtils');
 const { generateBadgeSvg } = require('../utils/badgeUtils');
 
+// Storage path for persistent view counts
+const STORAGE_PATH = path.join(__dirname, '..', 'storage');
+
+// In-memory fallback for environments where file storage fails (like serverless)
+const memoryStorage = new Map();
+
+// Flag to track if file storage is available
+let fileStorageAvailable = true;
+
 /**
  * Ensure storage directory exists
  * @returns {Promise<void>}
  */
 async function ensureStorageDirectory() {
+  if (!fileStorageAvailable) return;
+
   try {
     await fs.access(STORAGE_PATH);
   } catch (error) {
@@ -17,6 +28,7 @@ async function ensureStorageDirectory() {
       await fs.mkdir(STORAGE_PATH, { recursive: true });
     } catch (mkdirError) {
       console.warn('Could not create storage directory, falling back to memory storage:', mkdirError.message);
+      fileStorageAvailable = false;
     }
   }
 }
@@ -36,49 +48,61 @@ function getViewCountFilePath(repo) {
  * @returns {Promise<number>} Current view count
  */
 async function getViewCount(repo) {
-  // Try file storage first
-  const filePath = getViewCountFilePath(repo);
-  try {
-    const data = await fs.readFile(filePath, 'utf8');
-    const count = parseInt(data.trim(), 10) || 0;
-    // Sync memory storage
-    memoryStorage.set(repo, count);
-    return count;
-  } catch (error) {
-    // Fall back to memory storage
-    return memoryStorage.get(repo) || 0;
+  // Try file storage first if available
+  if (fileStorageAvailable) {
+    const filePath = getViewCountFilePath(repo);
+    try {
+      const data = await fs.readFile(filePath, 'utf8');
+      const count = parseInt(data.trim(), 10) || 0;
+      // Sync memory storage
+      memoryStorage.set(repo, count);
+      return count;
+    } catch (error) {
+      // File read failed, fall back to memory storage
+      fileStorageAvailable = false; // Disable for future calls
+    }
   }
+
+  // Fall back to memory storage
+  return memoryStorage.get(repo) || 0;
 }
 
-/**
- * Increment and save view count to file with memory fallback
- * @param {string} repo - The repo identifier
- * @returns {Promise<number>} New view count
- */
 async function incrementViewCount(repo) {
-  const currentCount = await getViewCount(repo);
-  const newCount = currentCount + 1;
-
-  // Update memory storage
-  memoryStorage.set(repo, newCount);
-
-  // Try to save to file
-  const filePath = getViewCountFilePath(repo);
   try {
-    await ensureStorageDirectory();
+    const currentCount = await getViewCount(repo);
+    const newCount = currentCount + 1;
 
-    // Also log the view with timestamp
-    const logFilePath = path.join(STORAGE_PATH, `${repo.replace('/', '-')}-views`);
-    const timestamp = new Date().toISOString();
-    await fs.appendFile(logFilePath, `${timestamp}\n`);
+    // Update memory storage
+    memoryStorage.set(repo, newCount);
 
-    // Save the new count
-    await fs.writeFile(filePath, newCount.toString(), 'utf8');
+    // Try to save to file only if file storage is available
+    if (fileStorageAvailable) {
+      const filePath = getViewCountFilePath(repo);
+      try {
+        await ensureStorageDirectory();
+
+        // Also log the view with timestamp
+        const logFilePath = path.join(STORAGE_PATH, `${repo.replace('/', '-')}-views`);
+        const timestamp = new Date().toISOString();
+        await fs.appendFile(logFilePath, `${timestamp}\n`);
+
+        // Save the new count
+        await fs.writeFile(filePath, newCount.toString(), 'utf8');
+      } catch (error) {
+        console.warn('File storage failed, using memory storage only:', error.message);
+        fileStorageAvailable = false; // Disable file storage for future calls
+      }
+    }
+
+    return newCount;
   } catch (error) {
-    console.warn('File storage failed, using memory storage only:', error.message);
+    console.error('Error in incrementViewCount:', error);
+    // Fallback to memory-only operation
+    const currentCount = memoryStorage.get(repo) || 0;
+    const newCount = currentCount + 1;
+    memoryStorage.set(repo, newCount);
+    return newCount;
   }
-
-  return newCount;
 }
 
 /**
@@ -107,9 +131,24 @@ class DynamicBadge {
    * @returns {Promise<string>} SVG badge
    */
   async generate() {
-    const text = await this.fetchData();
-    const iconData = await generateIcon(this.icon, this.iconColor);
-    return generateBadgeSvg(text, this.bgColor, iconData, this.textColor, this.edges);
+    try {
+      const text = await this.fetchData();
+      let iconData = null;
+      
+      if (this.icon) {
+        try {
+          iconData = await generateIcon(this.icon, this.iconColor);
+        } catch (iconError) {
+          console.warn('Icon generation failed, proceeding without icon:', iconError.message);
+        }
+      }
+      
+      return generateBadgeSvg(text, this.bgColor, iconData, this.textColor, this.edges);
+    } catch (error) {
+      console.error('Error in DynamicBadge.generate:', error);
+      // Return a simple error badge
+      return generateBadgeSvg('Error', 'red', null, 'white', 'squared');
+    }
   }
 }
 
@@ -123,8 +162,13 @@ class GitHubViewersBadge extends DynamicBadge {
   }
 
   async fetchData() {
-    const currentViews = await incrementViewCount(this.repo);
-    return currentViews.toString();
+    try {
+      const currentViews = await incrementViewCount(this.repo);
+      return currentViews.toString();
+    } catch (error) {
+      console.error('Error in GitHubViewersBadge.fetchData:', error);
+      return '0'; // Fallback
+    }
   }
 }
 
