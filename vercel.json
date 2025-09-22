@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "server.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "regions": ["iad1"],
+  "kv": {
+    "database": "ez-badges"
+  }
+}

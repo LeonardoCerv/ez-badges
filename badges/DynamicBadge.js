@@ -4,20 +4,78 @@ const path = require('path');
 const { generateIcon } = require('../utils/iconUtils');
 const { generateBadgeSvg } = require('../utils/badgeUtils');
 
-// Storage path for persistent view counts
+// Storage path for persistent view counts (fallback for local development)
 const STORAGE_PATH = path.join(__dirname, '..', 'storage');
 
-// In-memory fallback for environments where file storage fails (like serverless)
+// In-memory fallback for environments where persistent storage fails
 const memoryStorage = new Map();
 
-// Flag to track if file storage is available
+// Redis/Vercel KV client (only initialize if available)
+let kvClient = null;
+let redisStorageAvailable = false;
+
+// Initialize Redis client if Upstash environment variables are set
+try {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const { Redis } = require('@upstash/redis');
+    kvClient = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    redisStorageAvailable = true;
+    console.log('Upstash Redis storage initialized successfully');
+  } else if (process.env.KV_URL || process.env.VERCEL) {
+    // Fallback to Vercel KV if Upstash not configured
+    const { createClient } = require('@vercel/kv');
+    kvClient = createClient({
+      url: process.env.KV_URL,
+      token: process.env.KV_REST_API_TOKEN,
+    });
+    redisStorageAvailable = true;
+    console.log('Vercel KV storage initialized successfully');
+  }
+} catch (error) {
+  console.warn('Redis client initialization failed, falling back to file/memory storage:', error.message);
+}
+
+// Flag to track if file storage is available (for local development)
 let fileStorageAvailable = true;
 
 /**
- * Initialize memory storage by loading all existing file data
- * This ensures persistence across server restarts
+ * Initialize memory storage by loading all existing data from Redis and/or files
+ * This ensures persistence across server restarts and deployments
  */
 async function initializeMemoryStorage() {
+  console.log('Initializing persistent storage...');
+
+  // First, try to load from Redis if available
+  if (redisStorageAvailable && kvClient) {
+    try {
+      // Get all keys that match the views pattern
+      const keys = await kvClient.keys('views:*');
+      console.log(`Found ${keys.length} view records in Redis`);
+
+      for (const key of keys) {
+        try {
+          const count = await kvClient.get(key);
+          if (count !== null) {
+            const repo = key.replace('views:', '');
+            const numCount = parseInt(count, 10) || 0;
+            memoryStorage.set(repo, numCount);
+          }
+        } catch (keyError) {
+          console.warn(`Failed to load Redis key ${key}:`, keyError.message);
+        }
+      }
+
+      console.log(`Loaded ${memoryStorage.size} repositories from Redis`);
+      return; // If Redis worked, we don't need to load from files
+    } catch (redisError) {
+      console.warn('Redis initialization failed, falling back to file storage:', redisError.message);
+    }
+  }
+
+  // Fallback to file storage for local development
   if (!fileStorageAvailable) return;
 
   try {
@@ -34,13 +92,13 @@ async function initializeMemoryStorage() {
         const data = await fs.readFile(filePath, 'utf8');
         const count = parseInt(data.trim(), 10) || 0;
         memoryStorage.set(repo, count);
-        console.log(`Loaded ${count} views for ${repo} from persistent storage`);
+        console.log(`Loaded ${count} views for ${repo} from file storage`);
       } catch (fileError) {
         console.warn(`Failed to load count file ${countFile}:`, fileError.message);
       }
     }
 
-    console.log(`Initialized memory storage with ${memoryStorage.size} repositories`);
+    console.log(`Initialized memory storage with ${memoryStorage.size} repositories from files`);
   } catch (error) {
     console.warn('Failed to initialize memory storage from files:', error.message);
   }
@@ -76,19 +134,43 @@ function getViewCountFilePath(repo) {
 }
 
 /**
- * Read view count from file with fallback to memory
+ * Read view count from storage (Redis primary, file fallback, memory last resort)
  * @param {string} repo - The repo identifier
  * @returns {Promise<number>} Current view count
  */
 async function getViewCount(repo) {
-  // Try file storage first if available (this is now the primary storage)
+  const key = `views:${repo}`;
+
+  // Try Redis first if available
+  if (redisStorageAvailable && kvClient) {
+    try {
+      const count = await kvClient.get(key);
+      if (count !== null) {
+        const numCount = parseInt(count, 10) || 0;
+        // Sync memory storage for faster subsequent access
+        memoryStorage.set(repo, numCount);
+        return numCount;
+      }
+    } catch (error) {
+      console.warn('Redis get failed:', error.message);
+    }
+  }
+
+  // Try file storage if available
   if (fileStorageAvailable) {
     const filePath = getViewCountFilePath(repo);
     try {
       const data = await fs.readFile(filePath, 'utf8');
       const count = parseInt(data.trim(), 10) || 0;
-      // Sync memory storage for faster subsequent access
+      // Sync memory and Redis storage
       memoryStorage.set(repo, count);
+      if (redisStorageAvailable && kvClient) {
+        try {
+          await kvClient.set(key, count.toString());
+        } catch (redisError) {
+          console.warn('Redis sync failed:', redisError.message);
+        }
+      }
       return count;
     } catch (error) {
       // File doesn't exist or can't be read, check memory
@@ -100,7 +182,7 @@ async function getViewCount(repo) {
     }
   }
 
-  // File storage not available, use memory storage
+  // Fall back to memory storage
   return memoryStorage.get(repo) || 0;
 }
 
@@ -111,6 +193,17 @@ async function incrementViewCount(repo) {
 
     // Update memory storage immediately
     memoryStorage.set(repo, newCount);
+
+    const key = `views:${repo}`;
+
+    // Try to save to Redis first if available
+    if (redisStorageAvailable && kvClient) {
+      try {
+        await kvClient.set(key, newCount.toString());
+      } catch (redisError) {
+        console.warn('Redis save failed:', redisError.message);
+      }
+    }
 
     // Try to save to file (don't disable file storage on failure)
     if (fileStorageAvailable) {
