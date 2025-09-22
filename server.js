@@ -27,14 +27,30 @@ app.get('/badge', async (req, res) => {
     bgColor = 'white',
     iconColor,
     textColor = 'white',
-    edges = 'squared'
+    edges = 'squared',
+    v, // version/cache-busting parameter
+    cacheSeconds // optional cache duration override
   } = req.query;
 
   try {
     const svg = await generateStaticBadge({ text, icon, bgColor, iconColor, textColor, edges });
 
     res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    // Hybrid cache control approach
+    if (v || cacheSeconds) {
+      // User wants instant updates - maximum cache busting
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (cacheSeconds && parseInt(cacheSeconds) > 0) {
+      // User specified custom cache duration
+      res.setHeader('Cache-Control', `public, max-age=${parseInt(cacheSeconds)}`);
+    } else {
+      // Default: allow some caching for static badges
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+
     res.send(svg);
   } catch (error) {
     console.error('Error generating badge:', error);
@@ -54,7 +70,9 @@ app.get('/badge/dynamic/:type', async (req, res) => {
     bgColor = 'blue',
     iconColor,
     textColor = 'white',
-    edges = 'squared'
+    edges = 'squared',
+    v, // version/cache-busting parameter
+    cacheSeconds // optional cache duration override
   } = req.query;
 
   let badgeInstance;
@@ -88,7 +106,21 @@ app.get('/badge/dynamic/:type', async (req, res) => {
     const svg = await badgeInstance.generate();
 
     res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+
+    // Hybrid cache control approach (like Shields.io)
+    if (v || cacheSeconds) {
+      // User wants instant updates - maximum cache busting
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else if (cacheSeconds && parseInt(cacheSeconds) > 0) {
+      // User specified custom cache duration
+      res.setHeader('Cache-Control', `public, max-age=${parseInt(cacheSeconds)}`);
+    } else {
+      // Default: no-cache but allow some caching (GitHub will still cache briefly)
+      res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
+    }
+
     res.send(svg);
   } catch (error) {
     console.error('Error generating dynamic badge:', error);

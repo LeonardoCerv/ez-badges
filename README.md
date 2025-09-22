@@ -16,6 +16,39 @@ Visit [https://badges.0xleo.dev](https://badges.0xleo.dev) to explore the intera
 
 For local development, see the Development section below.
 
+## Cache Control
+
+EZ Badges uses a hybrid caching approach similar to Shields.io to balance performance with freshness:
+
+### Default Behavior
+- **Static badges**: Cached for 1 hour for better performance
+- **Dynamic badges**: No caching by default, but GitHub may still cache briefly (~5 minutes)
+
+### Cache Control Options
+
+#### Instant Updates (Maximum Cache Busting)
+Append `?v=timestamp` to any badge URL for instant updates:
+```
+https://badges.0xleo.dev/badge/dynamic/viewers?repo=owner/repo&v=1234567890
+```
+
+This sets maximum cache-busting headers and forces fresh data on every request.
+
+#### Custom Cache Duration
+Use `?cacheSeconds=N` to set a specific cache duration:
+```
+https://badges.0xleo.dev/badge/dynamic/stars?repo=owner/repo&cacheSeconds=300
+```
+
+This caches the badge for 5 minutes (300 seconds).
+
+### GitHub README Usage
+- **For frequently updating badges**: Use `?v=timestamp` in your README
+- **For stable badges**: Use default caching for better performance
+- **For custom timing**: Use `?cacheSeconds=N` for specific intervals
+
+**Note**: GitHub's Camo service may still cache images briefly regardless of headers.
+
 ## Contributing
 
 We welcome contributions! EZ Badges is an open-source project and we appreciate help from developers of all skill levels.
