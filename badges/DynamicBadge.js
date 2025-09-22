@@ -24,15 +24,6 @@ try {
     });
     redisStorageAvailable = true;
     console.log('Upstash Redis storage initialized successfully');
-  } else if (process.env.KV_URL || process.env.VERCEL) {
-    // Fallback to Vercel KV if Upstash not configured
-    const { createClient } = require('@vercel/kv');
-    kvClient = createClient({
-      url: process.env.KV_URL,
-      token: process.env.KV_REST_API_TOKEN,
-    });
-    redisStorageAvailable = true;
-    console.log('Vercel KV storage initialized successfully');
   }
 } catch (error) {
   console.warn('Redis client initialization failed, falling back to file/memory storage:', error.message);
@@ -40,6 +31,15 @@ try {
 
 // Flag to track if file storage is available (for local development)
 let fileStorageAvailable = true;
+
+// Detect serverless environments where file system is read-only
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+
+// Disable file storage in serverless environments
+if (isServerless) {
+  fileStorageAvailable = false;
+  console.log('Serverless environment detected, disabling file storage');
+}
 
 /**
  * Initialize memory storage by loading all existing data from Redis and/or files
@@ -75,8 +75,8 @@ async function initializeMemoryStorage() {
     }
   }
 
-  // Fallback to file storage for local development
-  if (!fileStorageAvailable) return;
+  // Fallback to file storage for local development only
+  if (!fileStorageAvailable || isServerless) return;
 
   try {
     await ensureStorageDirectory();
@@ -156,8 +156,8 @@ async function getViewCount(repo) {
     }
   }
 
-  // Try file storage if available
-  if (fileStorageAvailable) {
+  // Try file storage if available (only in local development)
+  if (fileStorageAvailable && !isServerless) {
     const filePath = getViewCountFilePath(repo);
     try {
       const data = await fs.readFile(filePath, 'utf8');
@@ -205,8 +205,8 @@ async function incrementViewCount(repo) {
       }
     }
 
-    // Try to save to file (don't disable file storage on failure)
-    if (fileStorageAvailable) {
+    // Try to save to file (only in local development, not serverless)
+    if (fileStorageAvailable && !isServerless) {
       const filePath = getViewCountFilePath(repo);
       try {
         await ensureStorageDirectory();
