@@ -103,9 +103,13 @@ async function initializeMemoryStorage() {
         // Upstash Redis
         keys = await redisClient.keys('views:*');
       } else {
-        // Heroku Redis - need to scan for keys
-        const scanResult = await redisClient.scan(0, { MATCH: 'views:*', COUNT: 1000 });
-        keys = scanResult.keys;
+        // Heroku Redis - use KEYS command instead of SCAN for simplicity
+        try {
+          keys = await redisClient.keys('views:*');
+        } catch (scanError) {
+          console.warn('Redis KEYS command failed, skipping Redis data loading:', scanError.message);
+          keys = [];
+        }
       }
 
       console.log(`Found ${keys.length} view records in Redis`);
@@ -133,6 +137,8 @@ async function initializeMemoryStorage() {
       return; // If Redis worked, we don't need to load from other sources
     } catch (redisError) {
       console.warn('Redis initialization failed, falling back to PostgreSQL:', redisError.message);
+      // Mark Redis as unavailable for this session
+      redisStorageAvailable = false;
     }
   }
 
@@ -150,6 +156,8 @@ async function initializeMemoryStorage() {
       return; // If PostgreSQL worked, we don't need to load from files
     } catch (postgresError) {
       console.warn('PostgreSQL initialization failed, falling back to file storage:', postgresError.message);
+      // Mark PostgreSQL as unavailable for this session
+      postgresStorageAvailable = false;
     }
   }
 
