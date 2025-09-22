@@ -10,61 +10,109 @@ const STORAGE_PATH = path.join(__dirname, '..', 'storage');
 // In-memory fallback for environments where persistent storage fails
 const memoryStorage = new Map();
 
-// Redis/Vercel KV client (only initialize if available)
-let kvClient = null;
+// Redis client (Heroku Redis primary, Upstash fallback)
+let redisClient = null;
 let redisStorageAvailable = false;
 
-// Initialize Redis client if Upstash environment variables are set
+// PostgreSQL client (backup storage)
+let postgresClient = null;
+let postgresStorageAvailable = false;
+
+// Initialize Redis client (Heroku Redis first, then Upstash fallback)
 try {
-  // Check for direct Upstash variables first (most reliable)
-  let redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  let redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-  
-  // Fallback to Vercel KV environment variables
-  if (!redisUrl || !redisToken) {
-    redisUrl = process.env.KV_REST_API_URL;
-    redisToken = process.env.KV_REST_API_TOKEN;
-  }
-  
-  if (redisUrl && redisToken) {
-    const { Redis } = require('@upstash/redis');
-    kvClient = new Redis({
-      url: redisUrl,
-      token: redisToken,
-    });
+  let redisUrl = process.env.REDIS_URL; // Heroku Redis
+
+  if (!redisUrl) {
+    // Fallback to Upstash
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      const { Redis } = require('@upstash/redis');
+      redisClient = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+      redisStorageAvailable = true;
+      console.log('Upstash Redis storage initialized successfully');
+    }
+  } else {
+    // Use Heroku Redis
+    const { createClient } = require('redis');
+    redisClient = createClient({ url: redisUrl });
+    redisClient.connect();
     redisStorageAvailable = true;
-    console.log('Upstash Redis storage initialized successfully');
+    console.log('Heroku Redis storage initialized successfully');
   }
 } catch (error) {
   console.warn('Redis client initialization failed, falling back to file/memory storage:', error.message);
+}
+
+// Initialize PostgreSQL client (backup storage)
+try {
+  if (process.env.DATABASE_URL) {
+    const { Client } = require('pg');
+    postgresClient = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false } // Required for Heroku Postgres
+    });
+    postgresClient.connect();
+    postgresStorageAvailable = true;
+    console.log('PostgreSQL backup storage initialized successfully');
+
+    // Create table if it doesn't exist
+    postgresClient.query(`
+      CREATE TABLE IF NOT EXISTS view_counts (
+        repo VARCHAR(255) PRIMARY KEY,
+        count INTEGER NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+} catch (error) {
+  console.warn('PostgreSQL client initialization failed:', error.message);
 }
 
 // Flag to track if file storage is available (for local development)
 let fileStorageAvailable = true;
 
 // Detect serverless environments where file system is read-only
-const isServerless = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
 
-// Note: VERCEL removed from detection to allow local development with Vercel CLI
-// File storage will be disabled automatically if the file system is read-only
+// Disable file storage in serverless environments
+if (isServerless) {
+  fileStorageAvailable = false;
+  console.log('Serverless environment detected, disabling file storage');
+}
 
 /**
- * Initialize memory storage by loading all existing data from Redis and/or files
+ * Initialize memory storage by loading all existing data from Redis, PostgreSQL, and/or files
  * This ensures persistence across server restarts and deployments
  */
 async function initializeMemoryStorage() {
   console.log('Initializing persistent storage...');
 
-  // First, try to load from Redis if available
-  if (redisStorageAvailable && kvClient) {
+  // First, try to load from Redis (Heroku Redis or Upstash)
+  if (redisStorageAvailable && redisClient) {
     try {
-      // Get all keys that match the views pattern
-      const keys = await kvClient.keys('views:*');
+      let keys;
+      if (redisClient instanceof require('@upstash/redis').Redis) {
+        // Upstash Redis
+        keys = await redisClient.keys('views:*');
+      } else {
+        // Heroku Redis - need to scan for keys
+        const scanResult = await redisClient.scan(0, { MATCH: 'views:*', COUNT: 1000 });
+        keys = scanResult.keys;
+      }
+
       console.log(`Found ${keys.length} view records in Redis`);
 
       for (const key of keys) {
         try {
-          const count = await kvClient.get(key);
+          let count;
+          if (redisClient instanceof require('@upstash/redis').Redis) {
+            count = await redisClient.get(key);
+          } else {
+            count = await redisClient.get(key);
+          }
+
           if (count !== null) {
             const repo = key.replace('views:', '');
             const numCount = parseInt(count, 10) || 0;
@@ -76,9 +124,26 @@ async function initializeMemoryStorage() {
       }
 
       console.log(`Loaded ${memoryStorage.size} repositories from Redis`);
-      return; // If Redis worked, we don't need to load from files
+      return; // If Redis worked, we don't need to load from other sources
     } catch (redisError) {
-      console.warn('Redis initialization failed, falling back to file storage:', redisError.message);
+      console.warn('Redis initialization failed, falling back to PostgreSQL:', redisError.message);
+    }
+  }
+
+  // Try to load from PostgreSQL backup
+  if (postgresStorageAvailable && postgresClient) {
+    try {
+      const result = await postgresClient.query('SELECT repo, count FROM view_counts');
+      console.log(`Found ${result.rows.length} view records in PostgreSQL`);
+
+      for (const row of result.rows) {
+        memoryStorage.set(row.repo, row.count);
+      }
+
+      console.log(`Loaded ${memoryStorage.size} repositories from PostgreSQL`);
+      return; // If PostgreSQL worked, we don't need to load from files
+    } catch (postgresError) {
+      console.warn('PostgreSQL initialization failed, falling back to file storage:', postgresError.message);
     }
   }
 
@@ -141,17 +206,25 @@ function getViewCountFilePath(repo) {
 }
 
 /**
- * Read view count from storage (Redis primary, file fallback, memory last resort)
+ * Read view count from storage (Redis primary, PostgreSQL backup, file fallback, memory last resort)
  * @param {string} repo - The repo identifier
  * @returns {Promise<number>} Current view count
  */
 async function getViewCount(repo) {
   const key = `views:${repo}`;
 
-  // Try Redis first if available
-  if (redisStorageAvailable && kvClient) {
+  // Try Redis first (Heroku Redis or Upstash)
+  if (redisStorageAvailable && redisClient) {
     try {
-      const count = await kvClient.get(key);
+      let count;
+      if (redisClient instanceof require('@upstash/redis').Redis) {
+        // Upstash Redis
+        count = await redisClient.get(key);
+      } else {
+        // Heroku Redis
+        count = await redisClient.get(key);
+      }
+
       if (count !== null) {
         const numCount = parseInt(count, 10) || 0;
         // Sync memory storage for faster subsequent access
@@ -163,21 +236,29 @@ async function getViewCount(repo) {
     }
   }
 
+  // Try PostgreSQL backup
+  if (postgresStorageAvailable && postgresClient) {
+    try {
+      const result = await postgresClient.query('SELECT count FROM view_counts WHERE repo = $1', [repo]);
+      if (result.rows.length > 0) {
+        const count = result.rows[0].count;
+        // Sync memory storage
+        memoryStorage.set(repo, count);
+        return count;
+      }
+    } catch (error) {
+      console.warn('PostgreSQL get failed:', error.message);
+    }
+  }
+
   // Try file storage if available (only in local development)
   if (fileStorageAvailable && !isServerless) {
     const filePath = getViewCountFilePath(repo);
     try {
       const data = await fs.readFile(filePath, 'utf8');
       const count = parseInt(data.trim(), 10) || 0;
-      // Sync memory and Redis storage
+      // Sync memory storage
       memoryStorage.set(repo, count);
-      if (redisStorageAvailable && kvClient) {
-        try {
-          await kvClient.set(key, count.toString());
-        } catch (redisError) {
-          console.warn('Redis sync failed:', redisError.message);
-        }
-      }
       return count;
     } catch (error) {
       // File doesn't exist or can't be read, check memory
@@ -203,12 +284,33 @@ async function incrementViewCount(repo) {
 
     const key = `views:${repo}`;
 
-    // Try to save to Redis first if available
-    if (redisStorageAvailable && kvClient) {
+    // Try to save to Redis first (Heroku Redis or Upstash)
+    if (redisStorageAvailable && redisClient) {
       try {
-        await kvClient.set(key, newCount.toString());
+        if (redisClient instanceof require('@upstash/redis').Redis) {
+          // Upstash Redis
+          await redisClient.set(key, newCount.toString());
+        } else {
+          // Heroku Redis
+          await redisClient.set(key, newCount);
+        }
       } catch (redisError) {
         console.warn('Redis save failed:', redisError.message);
+      }
+    }
+
+    // Try to save to PostgreSQL backup
+    if (postgresStorageAvailable && postgresClient) {
+      try {
+        await postgresClient.query(`
+          INSERT INTO view_counts (repo, count, updated_at)
+          VALUES ($1, $2, CURRENT_TIMESTAMP)
+          ON CONFLICT (repo) DO UPDATE SET
+            count = EXCLUDED.count,
+            updated_at = CURRENT_TIMESTAMP
+        `, [repo, newCount]);
+      } catch (postgresError) {
+        console.warn('PostgreSQL save failed:', postgresError.message);
       }
     }
 
@@ -227,8 +329,6 @@ async function incrementViewCount(repo) {
         await fs.writeFile(filePath, newCount.toString(), 'utf8');
       } catch (error) {
         console.warn('File storage failed, continuing with memory storage:', error.message);
-        // Don't disable file storage permanently - it might work again later
-        // fileStorageAvailable = false; // Commented out - don't disable permanently
       }
     }
 
