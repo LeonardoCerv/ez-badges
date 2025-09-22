@@ -1,9 +1,57 @@
 const axios = require('axios');
+const fs = require('fs').promises;
+const path = require('path');
 const { generateIcon } = require('../utils/iconUtils');
 const { generateBadgeSvg } = require('../utils/badgeUtils');
 
-// Storage for repo view counts (in-memory, resets on server restart)
-const repoViews = new Map();
+// Storage path for persistent view counts
+const STORAGE_PATH = path.join(__dirname, '..', 'storage');
+
+/**
+ * Get the file path for a repo's view count
+ * @param {string} repo - The repo identifier
+ * @returns {string} File path
+ */
+function getViewCountFilePath(repo) {
+  return path.join(STORAGE_PATH, `${repo.replace('/', '-')}-views-count`);
+}
+
+/**
+ * Read view count from file
+ * @param {string} repo - The repo identifier
+ * @returns {Promise<number>} Current view count
+ */
+async function getViewCount(repo) {
+  const filePath = getViewCountFilePath(repo);
+  try {
+    const data = await fs.readFile(filePath, 'utf8');
+    return parseInt(data.trim(), 10) || 0;
+  } catch (error) {
+    // File doesn't exist yet
+    return 0;
+  }
+}
+
+/**
+ * Increment and save view count to file
+ * @param {string} repo - The repo identifier
+ * @returns {Promise<number>} New view count
+ */
+async function incrementViewCount(repo) {
+  const filePath = getViewCountFilePath(repo);
+  const currentCount = await getViewCount(repo);
+  const newCount = currentCount + 1;
+
+  // Also log the view with timestamp
+  const logFilePath = path.join(STORAGE_PATH, `${repo.replace('/', '-')}-views`);
+  const timestamp = new Date().toISOString();
+  await fs.appendFile(logFilePath, `${timestamp}\n`);
+
+  // Save the new count
+  await fs.writeFile(filePath, newCount.toString(), 'utf8');
+
+  return newCount;
+}
 
 /**
  * Base class for dynamic badges that fetch data from external sources.
@@ -47,11 +95,7 @@ class GitHubViewersBadge extends DynamicBadge {
   }
 
   async fetchData() {
-    if (!repoViews.has(this.repo)) {
-      repoViews.set(this.repo, 0);
-    }
-    const currentViews = repoViews.get(this.repo) + 1;
-    repoViews.set(this.repo, currentViews);
+    const currentViews = await incrementViewCount(this.repo);
     return currentViews.toString();
   }
 }

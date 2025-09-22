@@ -88,7 +88,7 @@ app.get('/badge/dynamic/:type', async (req, res) => {
     const svg = await badgeInstance.generate();
 
     res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'public, max-age=300'); // Shorter cache for dynamic
+    res.setHeader('Cache-Control', 'max-age=0, no-cache, no-store, must-revalidate');
     res.send(svg);
   } catch (error) {
     console.error('Error generating dynamic badge:', error);
