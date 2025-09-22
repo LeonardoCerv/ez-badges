@@ -34,9 +34,15 @@ try {
       console.log('Upstash Redis storage initialized successfully');
     }
   } else {
-    // Use Heroku Redis
+    // Use Heroku Redis with TLS configuration
     const { createClient } = require('redis');
-    redisClient = createClient({ url: redisUrl });
+    redisClient = createClient({
+      url: redisUrl,
+      socket: {
+        tls: true,
+        rejectUnauthorized: false // Allow self-signed certificates for Heroku Redis
+      }
+    });
     redisClient.connect();
     redisStorageAvailable = true;
     console.log('Heroku Redis storage initialized successfully');
