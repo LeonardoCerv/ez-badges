@@ -4,7 +4,7 @@ A dynamic SVG badge generator inspired by img.shields.io, featuring the ability 
 
 **Note:** The `iconColor` parameter works reliably with supported icon libraries but may have limitations with custom image paths.
 
-[![Views](https://ez-badges-kyojnjbou-leonardos-projects-b4e38681.vercel.app/badge/dynamic/viewers?repo=leonardocerv/ez-badges&textColor=green&icon=simple-icons:eye&v=1234567890)](https://github.com/LeonardoCerv/ez-badges)
+[![Views](https://ez-badges-kyojnjbou-leonardos-projects-b4e38681.vercel.app/badge/dynamic/viewers?repo=leonardocerv/ez-badges&textColor=green&v=1234567890)](https://github.com/LeonardoCerv/ez-badges)
 [![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&bgColor=amber&edges=squared&textColor=white&iconColor=white&icon=simple-icons:javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Node.js](https://badges.0xleo.dev/badge?text=NodeJS&bgColor=green&edges=squared&textColor=white&iconColor=white&icon=simple-icons:nodedotjs)](https://nodejs.org)
 [![Express](https://badges.0xleo.dev/badge?text=Express&bgColor=white&textColor=black&icon=simple-icons:express)](https://expressjs.com)
