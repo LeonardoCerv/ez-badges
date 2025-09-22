@@ -4,8 +4,22 @@ const path = require('path');
 const { generateIcon } = require('../utils/iconUtils');
 const { generateBadgeSvg } = require('../utils/badgeUtils');
 
-// Storage path for persistent view counts
-const STORAGE_PATH = path.join(__dirname, '..', 'storage');
+/**
+ * Ensure storage directory exists
+ * @returns {Promise<void>}
+ */
+async function ensureStorageDirectory() {
+  try {
+    await fs.access(STORAGE_PATH);
+  } catch (error) {
+    // Directory doesn't exist, try to create it
+    try {
+      await fs.mkdir(STORAGE_PATH, { recursive: true });
+    } catch (mkdirError) {
+      console.warn('Could not create storage directory, falling back to memory storage:', mkdirError.message);
+    }
+  }
+}
 
 /**
  * Get the file path for a repo's view count
@@ -17,38 +31,52 @@ function getViewCountFilePath(repo) {
 }
 
 /**
- * Read view count from file
+ * Read view count from file with fallback to memory
  * @param {string} repo - The repo identifier
  * @returns {Promise<number>} Current view count
  */
 async function getViewCount(repo) {
+  // Try file storage first
   const filePath = getViewCountFilePath(repo);
   try {
     const data = await fs.readFile(filePath, 'utf8');
-    return parseInt(data.trim(), 10) || 0;
+    const count = parseInt(data.trim(), 10) || 0;
+    // Sync memory storage
+    memoryStorage.set(repo, count);
+    return count;
   } catch (error) {
-    // File doesn't exist yet
-    return 0;
+    // Fall back to memory storage
+    return memoryStorage.get(repo) || 0;
   }
 }
 
 /**
- * Increment and save view count to file
+ * Increment and save view count to file with memory fallback
  * @param {string} repo - The repo identifier
  * @returns {Promise<number>} New view count
  */
 async function incrementViewCount(repo) {
-  const filePath = getViewCountFilePath(repo);
   const currentCount = await getViewCount(repo);
   const newCount = currentCount + 1;
 
-  // Also log the view with timestamp
-  const logFilePath = path.join(STORAGE_PATH, `${repo.replace('/', '-')}-views`);
-  const timestamp = new Date().toISOString();
-  await fs.appendFile(logFilePath, `${timestamp}\n`);
+  // Update memory storage
+  memoryStorage.set(repo, newCount);
 
-  // Save the new count
-  await fs.writeFile(filePath, newCount.toString(), 'utf8');
+  // Try to save to file
+  const filePath = getViewCountFilePath(repo);
+  try {
+    await ensureStorageDirectory();
+
+    // Also log the view with timestamp
+    const logFilePath = path.join(STORAGE_PATH, `${repo.replace('/', '-')}-views`);
+    const timestamp = new Date().toISOString();
+    await fs.appendFile(logFilePath, `${timestamp}\n`);
+
+    // Save the new count
+    await fs.writeFile(filePath, newCount.toString(), 'utf8');
+  } catch (error) {
+    console.warn('File storage failed, using memory storage only:', error.message);
+  }
 
   return newCount;
 }
@@ -91,7 +119,7 @@ class DynamicBadge {
 class GitHubViewersBadge extends DynamicBadge {
   constructor({ repo, ...options }) {
     super(options);
-    this.repo = repo; // e.g., 'owner/repo'
+    this.repo = repo.toLowerCase(); // Normalize to lowercase for consistency
   }
 
   async fetchData() {
@@ -106,7 +134,7 @@ class GitHubViewersBadge extends DynamicBadge {
 class GitHubStarsBadge extends DynamicBadge {
   constructor({ repo, ...options }) {
     super(options);
-    this.repo = repo; // e.g., 'owner/repo'
+    this.repo = repo.toLowerCase(); // Normalize to lowercase
   }
 
   async fetchData() {
@@ -146,7 +174,7 @@ class DownloadsBadge extends DynamicBadge {
 class LastCommitBadge extends DynamicBadge {
   constructor({ repo, ...options }) {
     super(options);
-    this.repo = repo;
+    this.repo = repo.toLowerCase(); // Normalize to lowercase
   }
 
   async fetchData() {
@@ -170,7 +198,7 @@ class LastCommitBadge extends DynamicBadge {
 class OpenIssuesBadge extends DynamicBadge {
   constructor({ repo, ...options }) {
     super(options);
-    this.repo = repo;
+    this.repo = repo.toLowerCase(); // Normalize to lowercase
   }
 
   async fetchData() {
