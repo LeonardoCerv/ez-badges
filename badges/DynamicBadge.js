@@ -62,14 +62,9 @@ try {
       redisStorageAvailable = false;
     });
 
-    try {
-      await redisClient.connect();
-      redisStorageAvailable = true;
-      console.log('Heroku Redis storage initialized successfully');
-    } catch (connectError) {
-      console.warn('Failed to connect to Heroku Redis:', connectError.message);
-      redisStorageAvailable = false;
-    }
+    // Mark as available initially - will connect lazily
+    redisStorageAvailable = true;
+    console.log('Heroku Redis client initialized (lazy connection)');
   }
 } catch (error) {
   console.warn('Redis client initialization failed, falling back to file/memory storage:', error.message);
@@ -129,11 +124,10 @@ async function initializeMemoryStorage() {
       } else {
         // Heroku Redis - use KEYS command instead of SCAN for simplicity
         try {
-          if (redisClient.isOpen) {
-            keys = await redisClient.keys('views:*');
-          } else {
-            throw new Error('Redis connection not available');
+          if (!redisClient.isOpen) {
+            await redisClient.connect();
           }
+          keys = await redisClient.keys('views:*');
         } catch (scanError) {
           console.warn('Redis KEYS command failed, skipping Redis data loading:', scanError.message);
           keys = [];
@@ -148,12 +142,11 @@ async function initializeMemoryStorage() {
           if (redisClient instanceof require('@upstash/redis').Redis) {
             count = await redisClient.get(key);
           } else {
-            // Heroku Redis - check if connected first
-            if (redisClient.isOpen) {
-              count = await redisClient.get(key);
-            } else {
-              throw new Error('Redis connection not available');
+            // Heroku Redis - ensure connected first
+            if (!redisClient.isOpen) {
+              await redisClient.connect();
             }
+            count = await redisClient.get(key);
           }
 
           if (count !== null) {
@@ -268,12 +261,11 @@ async function getViewCount(repo) {
         // Upstash Redis
         count = await redisClient.get(key);
       } else {
-        // Heroku Redis - check if connected first
-        if (redisClient.isOpen) {
-          count = await redisClient.get(key);
-        } else {
-          throw new Error('Redis connection not available');
+        // Heroku Redis - ensure connected first
+        if (!redisClient.isOpen) {
+          await redisClient.connect();
         }
+        count = await redisClient.get(key);
       }
 
       if (count !== null) {
@@ -343,12 +335,11 @@ async function incrementViewCount(repo) {
           // Upstash Redis
           await redisClient.set(key, newCount.toString());
         } else {
-          // Heroku Redis - check if connected first
-          if (redisClient.isOpen) {
-            await redisClient.set(key, newCount);
-          } else {
-            throw new Error('Redis connection not available');
+          // Heroku Redis - ensure connected first
+          if (!redisClient.isOpen) {
+            await redisClient.connect();
           }
+          await redisClient.set(key, newCount);
         }
       } catch (redisError) {
         console.warn('Redis save failed, falling back to PostgreSQL:', redisError.message);
