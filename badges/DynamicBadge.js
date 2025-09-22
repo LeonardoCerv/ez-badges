@@ -16,11 +16,21 @@ let redisStorageAvailable = false;
 
 // Initialize Redis client if Upstash environment variables are set
 try {
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  // Check for Vercel KV environment variables first (preferred for Vercel deployments)
+  let redisUrl = process.env.KV_REST_API_URL;
+  let redisToken = process.env.KV_REST_API_TOKEN;
+  
+  // Fallback to direct Upstash variables if Vercel KV not found
+  if (!redisUrl || !redisToken) {
+    redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  }
+  
+  if (redisUrl && redisToken) {
     const { Redis } = require('@upstash/redis');
     kvClient = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      url: redisUrl,
+      token: redisToken,
     });
     redisStorageAvailable = true;
     console.log('Upstash Redis storage initialized successfully');
@@ -33,13 +43,10 @@ try {
 let fileStorageAvailable = true;
 
 // Detect serverless environments where file system is read-only
-const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
+const isServerless = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT;
 
-// Disable file storage in serverless environments
-if (isServerless) {
-  fileStorageAvailable = false;
-  console.log('Serverless environment detected, disabling file storage');
-}
+// Note: VERCEL removed from detection to allow local development with Vercel CLI
+// File storage will be disabled automatically if the file system is read-only
 
 /**
  * Initialize memory storage by loading all existing data from Redis and/or files

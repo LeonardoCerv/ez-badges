@@ -83,53 +83,6 @@ https://badges.0xleo.dev/badge/dynamic/viewers?repo=owner/repo&text=Profile%20Vi
 
 This creates a badge showing "Profile Views: 123" with an eye icon, blue background, and cache busting.
 
-## Deployment
-
-### Vercel Deployment with Upstash Redis
-
-EZ Badges supports persistent visitor counts on Vercel using Upstash Redis:
-
-1. **Connect to your project**:
-   ```bash
-   vercel link
-   ```
-
-2. **Pull environment variables**:
-   ```bash
-   vercel env pull .env.development.local
-   ```
-
-3. **Install the Upstash Redis SDK**:
-   ```bash
-   npm install @upstash/redis
-   ```
-
-4. **Set Environment Variables** in Vercel (these should be automatically available):
-   ```
-   UPSTASH_REDIS_REST_URL=https://your-db.upstash.io
-   UPSTASH_REDIS_REST_TOKEN=your_token_here
-   ```
-
-5. **Deploy to Vercel**:
-   ```bash
-   vercel --prod
-   ```
-
-The app will automatically detect Upstash Redis and use it for persistent storage. Visitor counts will survive server restarts and cold starts.
-
-### Upstash Setup
-
-If you haven't set up Upstash yet:
-
-1. **Create Upstash Account**: Visit [upstash.com](https://upstash.com) and sign up
-2. **Create Redis Database**: Choose your region and plan
-3. **Get Connection Details**: Copy REST URL and REST Token
-4. **Add to Vercel**: Set the environment variables in your Vercel project settings
-
-### Local Development
-
-For local development, the app uses file-based storage in the `storage/` directory.
-
 ## Contributing
 
 We welcome contributions! EZ Badges is an open-source project and we appreciate help from developers of all skill levels.
