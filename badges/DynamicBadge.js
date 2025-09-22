@@ -40,12 +40,36 @@ try {
       url: redisUrl,
       socket: {
         tls: true,
-        rejectUnauthorized: false // Allow self-signed certificates for Heroku Redis
-      }
+        rejectUnauthorized: false,
+        // Add connection timeout and keep alive
+        connectTimeout: 60000,
+        commandTimeout: 5000,
+        keepAlive: 30000,
+        lazyConnect: true
+      },
+      // Disable automatic reconnection to prevent crashes
+      retry_strategy: null
     });
-    redisClient.connect();
-    redisStorageAvailable = true;
-    console.log('Heroku Redis storage initialized successfully');
+
+    // Add error event handler to prevent unhandled exceptions
+    redisClient.on('error', (err) => {
+      console.warn('Redis client error (non-fatal):', err.message);
+      redisStorageAvailable = false;
+    });
+
+    redisClient.on('end', () => {
+      console.warn('Redis connection ended');
+      redisStorageAvailable = false;
+    });
+
+    try {
+      await redisClient.connect();
+      redisStorageAvailable = true;
+      console.log('Heroku Redis storage initialized successfully');
+    } catch (connectError) {
+      console.warn('Failed to connect to Heroku Redis:', connectError.message);
+      redisStorageAvailable = false;
+    }
   }
 } catch (error) {
   console.warn('Redis client initialization failed, falling back to file/memory storage:', error.message);
@@ -105,7 +129,11 @@ async function initializeMemoryStorage() {
       } else {
         // Heroku Redis - use KEYS command instead of SCAN for simplicity
         try {
-          keys = await redisClient.keys('views:*');
+          if (redisClient.isOpen) {
+            keys = await redisClient.keys('views:*');
+          } else {
+            throw new Error('Redis connection not available');
+          }
         } catch (scanError) {
           console.warn('Redis KEYS command failed, skipping Redis data loading:', scanError.message);
           keys = [];
@@ -120,7 +148,12 @@ async function initializeMemoryStorage() {
           if (redisClient instanceof require('@upstash/redis').Redis) {
             count = await redisClient.get(key);
           } else {
-            count = await redisClient.get(key);
+            // Heroku Redis - check if connected first
+            if (redisClient.isOpen) {
+              count = await redisClient.get(key);
+            } else {
+              throw new Error('Redis connection not available');
+            }
           }
 
           if (count !== null) {
@@ -235,8 +268,12 @@ async function getViewCount(repo) {
         // Upstash Redis
         count = await redisClient.get(key);
       } else {
-        // Heroku Redis
-        count = await redisClient.get(key);
+        // Heroku Redis - check if connected first
+        if (redisClient.isOpen) {
+          count = await redisClient.get(key);
+        } else {
+          throw new Error('Redis connection not available');
+        }
       }
 
       if (count !== null) {
@@ -246,7 +283,8 @@ async function getViewCount(repo) {
         return numCount;
       }
     } catch (error) {
-      console.warn('Redis get failed:', error.message);
+      console.warn('Redis get failed, falling back to PostgreSQL:', error.message);
+      redisStorageAvailable = false; // Mark as unavailable
     }
   }
 
@@ -305,11 +343,16 @@ async function incrementViewCount(repo) {
           // Upstash Redis
           await redisClient.set(key, newCount.toString());
         } else {
-          // Heroku Redis
-          await redisClient.set(key, newCount);
+          // Heroku Redis - check if connected first
+          if (redisClient.isOpen) {
+            await redisClient.set(key, newCount);
+          } else {
+            throw new Error('Redis connection not available');
+          }
         }
       } catch (redisError) {
-        console.warn('Redis save failed:', redisError.message);
+        console.warn('Redis save failed, falling back to PostgreSQL:', redisError.message);
+        redisStorageAvailable = false; // Mark as unavailable
       }
     }
 
