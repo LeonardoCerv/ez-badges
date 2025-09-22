@@ -4,10 +4,11 @@ A dynamic SVG badge generator inspired by img.shields.io, featuring the ability 
 
 **Note:** The `iconColor` parameter works reliably with supported icon libraries but may have limitations with custom image paths.
 
-[![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&iconColor=white&bgColor=amber&edges=squared&textColor=white&icon=simple-icons:javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![Node.js](https://badges.0xleo.dev/badge?text=NodeJS&iconColor=white&bgColor=3C873A&edges=squared&textColor=white&icon=simple-icons:nodedotjs)](https://nodejs.org)
-[![Express](https://badges.0xleo.dev/badge?text=Express&bgColor=white&textColor=black&iconColor=black&icon=simple-icons:express)](https://expressjs.com)
-[![Sharp](https://badges.0xleo.dev/badge?text=Sharp&iconColor=white&bgColor=98CB00&icon=simple-icons:sharp)](https://sharp.pixelplumbing.com)
+[![Views](https://badges.0xleo.dev/badge/dynamic/viewers?repo=leonardocerv/ez-badges)](https://github.com/LeonardoCerv/ez-badges)
+[![JavaScript](https://badges.0xleo.dev/badge?text=JavaScript&bgColor=amber&edges=squared&textColor=white&iconColor=white&icon=simple-icons:javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Node.js](https://badges.0xleo.dev/badge?text=NodeJS&bgColor=green&edges=squared&textColor=white&iconColor=white&icon=simple-icons:nodedotjs)](https://nodejs.org)
+[![Express](https://badges.0xleo.dev/badge?text=Express&bgColor=white&textColor=black&icon=simple-icons:express)](https://expressjs.com)
+[![Sharp](https://badges.0xleo.dev/badge?text=Sharp&bgColor=olive&iconColor=white&icon=simple-icons:sharp)](https://sharp.pixelplumbing.com)
 
 ## Quick Start
 
