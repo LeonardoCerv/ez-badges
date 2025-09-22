@@ -49,6 +49,40 @@ This caches the badge for 5 minutes (300 seconds).
 
 **Note**: GitHub's Camo service may still cache images briefly regardless of headers.
 
+## Dynamic Badge Customization
+
+Dynamic badges now support custom text labels to make them more descriptive. Use the `text` parameter to add a prefix to your dynamic values:
+
+### Examples
+
+#### View Counter with Custom Label
+```
+https://badges.0xleo.dev/badge/dynamic/viewers?repo=owner/repo&text=Views
+```
+Shows: "Views: 123"
+
+#### Stars with Custom Label
+```
+https://badges.0xleo.dev/badge/dynamic/stars?repo=owner/repo&text=Stars
+```
+Shows: "Stars: 456"
+
+#### Downloads with Custom Label
+```
+https://badges.0xleo.dev/badge/dynamic/downloads?package=your-package&text=Downloads
+```
+Shows: "Downloads: 789"
+
+### Combining with Other Parameters
+
+You can combine the `text` parameter with icons, colors, and cache control:
+
+```
+https://badges.0xleo.dev/badge/dynamic/viewers?repo=owner/repo&text=Profile%20Views&icon=simple-icons:eye&bgColor=blue&textColor=white&v=timestamp
+```
+
+This creates a badge showing "Profile Views: 123" with an eye icon, blue background, and cache busting.
+
 ## Contributing
 
 We welcome contributions! EZ Badges is an open-source project and we appreciate help from developers of all skill levels.

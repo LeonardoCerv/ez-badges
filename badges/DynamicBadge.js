@@ -14,6 +14,39 @@ const memoryStorage = new Map();
 let fileStorageAvailable = true;
 
 /**
+ * Initialize memory storage by loading all existing file data
+ * This ensures persistence across server restarts
+ */
+async function initializeMemoryStorage() {
+  if (!fileStorageAvailable) return;
+
+  try {
+    await ensureStorageDirectory();
+
+    // Read all view count files and load into memory
+    const files = await fs.readdir(STORAGE_PATH);
+    const countFiles = files.filter(file => file.endsWith('-views-count'));
+
+    for (const countFile of countFiles) {
+      try {
+        const repo = countFile.replace('-views-count', '').replace(/-/g, '/');
+        const filePath = path.join(STORAGE_PATH, countFile);
+        const data = await fs.readFile(filePath, 'utf8');
+        const count = parseInt(data.trim(), 10) || 0;
+        memoryStorage.set(repo, count);
+        console.log(`Loaded ${count} views for ${repo} from persistent storage`);
+      } catch (fileError) {
+        console.warn(`Failed to load count file ${countFile}:`, fileError.message);
+      }
+    }
+
+    console.log(`Initialized memory storage with ${memoryStorage.size} repositories`);
+  } catch (error) {
+    console.warn('Failed to initialize memory storage from files:', error.message);
+  }
+}
+
+/**
  * Ensure storage directory exists
  * @returns {Promise<void>}
  */
@@ -48,22 +81,26 @@ function getViewCountFilePath(repo) {
  * @returns {Promise<number>} Current view count
  */
 async function getViewCount(repo) {
-  // Try file storage first if available
+  // Try file storage first if available (this is now the primary storage)
   if (fileStorageAvailable) {
     const filePath = getViewCountFilePath(repo);
     try {
       const data = await fs.readFile(filePath, 'utf8');
       const count = parseInt(data.trim(), 10) || 0;
-      // Sync memory storage
+      // Sync memory storage for faster subsequent access
       memoryStorage.set(repo, count);
       return count;
     } catch (error) {
-      // File read failed, fall back to memory storage
-      fileStorageAvailable = false; // Disable for future calls
+      // File doesn't exist or can't be read, check memory
+      if (memoryStorage.has(repo)) {
+        return memoryStorage.get(repo);
+      }
+      // Neither file nor memory has data, return 0
+      return 0;
     }
   }
 
-  // Fall back to memory storage
+  // File storage not available, use memory storage
   return memoryStorage.get(repo) || 0;
 }
 
@@ -72,10 +109,10 @@ async function incrementViewCount(repo) {
     const currentCount = await getViewCount(repo);
     const newCount = currentCount + 1;
 
-    // Update memory storage
+    // Update memory storage immediately
     memoryStorage.set(repo, newCount);
 
-    // Try to save to file only if file storage is available
+    // Try to save to file (don't disable file storage on failure)
     if (fileStorageAvailable) {
       const filePath = getViewCountFilePath(repo);
       try {
@@ -89,8 +126,9 @@ async function incrementViewCount(repo) {
         // Save the new count
         await fs.writeFile(filePath, newCount.toString(), 'utf8');
       } catch (error) {
-        console.warn('File storage failed, using memory storage only:', error.message);
-        fileStorageAvailable = false; // Disable file storage for future calls
+        console.warn('File storage failed, continuing with memory storage:', error.message);
+        // Don't disable file storage permanently - it might work again later
+        // fileStorageAvailable = false; // Commented out - don't disable permanently
       }
     }
 
@@ -110,7 +148,8 @@ async function incrementViewCount(repo) {
  * Subclasses should implement fetchData() to retrieve dynamic values.
  */
 class DynamicBadge {
-  constructor({ icon, bgColor = 'blue', iconColor, textColor = 'white', edges = 'squared' }) {
+  constructor({ text, icon, bgColor = 'blue', iconColor, textColor = 'white', edges = 'squared' }) {
+    this.text = text; // Custom text prefix
     this.icon = icon;
     this.bgColor = bgColor;
     this.iconColor = iconColor;
@@ -132,9 +171,16 @@ class DynamicBadge {
    */
   async generate() {
     try {
-      const text = await this.fetchData();
+      const dynamicValue = await this.fetchData();
+      let displayText = dynamicValue;
+
+      // If custom text is provided, combine it with the dynamic value
+      if (this.text) {
+        displayText = `${this.text}: ${dynamicValue}`;
+      }
+
       let iconData = null;
-      
+
       if (this.icon) {
         try {
           iconData = await generateIcon(this.icon, this.iconColor);
@@ -142,8 +188,8 @@ class DynamicBadge {
           console.warn('Icon generation failed, proceeding without icon:', iconError.message);
         }
       }
-      
-      return generateBadgeSvg(text, this.bgColor, iconData, this.textColor, this.edges);
+
+      return generateBadgeSvg(displayText, this.bgColor, iconData, this.textColor, this.edges);
     } catch (error) {
       console.error('Error in DynamicBadge.generate:', error);
       // Return a simple error badge
@@ -262,5 +308,6 @@ module.exports = {
   GitHubStarsBadge,
   DownloadsBadge,
   LastCommitBadge,
-  OpenIssuesBadge
+  OpenIssuesBadge,
+  initializeMemoryStorage
 };

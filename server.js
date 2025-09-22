@@ -11,7 +11,7 @@
 
 const express = require('express');
 const { generateStaticBadge } = require('./badges/StaticBadge');
-const { GitHubViewersBadge, GitHubStarsBadge, DownloadsBadge, LastCommitBadge, OpenIssuesBadge } = require('./badges/DynamicBadge');
+const { GitHubViewersBadge, GitHubStarsBadge, DownloadsBadge, LastCommitBadge, OpenIssuesBadge, initializeMemoryStorage } = require('./badges/DynamicBadge');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -66,14 +66,14 @@ app.get('/badge/dynamic/:type', async (req, res) => {
   const {
     repo,
     package: packageName,
+    text, // Custom text to show before the dynamic value
     icon,
     bgColor = 'blue',
     iconColor,
     textColor = 'white',
     edges = 'squared',
     v, // version/cache-busting parameter
-    cacheSeconds, // optional cache duration override
-    noIcon // disable icon processing if true
+    cacheSeconds // optional cache duration override
   } = req.query;
 
   let badgeInstance;
@@ -82,23 +82,23 @@ app.get('/badge/dynamic/:type', async (req, res) => {
     switch (type) {
       case 'viewers':
         if (!repo) return res.status(400).send('Missing repo parameter');
-        badgeInstance = new GitHubViewersBadge({ repo, icon: noIcon ? null : icon, bgColor, iconColor, textColor, edges });
+        badgeInstance = new GitHubViewersBadge({ repo, text, icon, bgColor, iconColor, textColor, edges });
         break;
       case 'stars':
         if (!repo) return res.status(400).send('Missing repo parameter');
-        badgeInstance = new GitHubStarsBadge({ repo, icon: noIcon ? null : icon, bgColor, iconColor, textColor, edges });
+        badgeInstance = new GitHubStarsBadge({ repo, text, icon, bgColor, iconColor, textColor, edges });
         break;
       case 'downloads':
         if (!packageName) return res.status(400).send('Missing package parameter');
-        badgeInstance = new DownloadsBadge({ package: packageName, icon: noIcon ? null : icon, bgColor, iconColor, textColor, edges });
+        badgeInstance = new DownloadsBadge({ package: packageName, text, icon, bgColor, iconColor, textColor, edges });
         break;
       case 'last-commit':
         if (!repo) return res.status(400).send('Missing repo parameter');
-        badgeInstance = new LastCommitBadge({ repo, icon: noIcon ? null : icon, bgColor, iconColor, textColor, edges });
+        badgeInstance = new LastCommitBadge({ repo, text, icon, bgColor, iconColor, textColor, edges });
         break;
       case 'open-issues':
         if (!repo) return res.status(400).send('Missing repo parameter');
-        badgeInstance = new OpenIssuesBadge({ repo, icon: noIcon ? null : icon, bgColor, iconColor, textColor, edges });
+        badgeInstance = new OpenIssuesBadge({ repo, text, icon, bgColor, iconColor, textColor, edges });
         break;
       default:
         return res.status(400).send('Invalid badge type');
@@ -126,7 +126,7 @@ app.get('/badge/dynamic/:type', async (req, res) => {
   } catch (error) {
     console.error('Error generating dynamic badge:', error);
     console.error('Error stack:', error.stack);
-    console.error('Request params:', { type, repo, packageName, icon, bgColor, iconColor, textColor, edges, v, cacheSeconds });
+    console.error('Request params:', { type, repo, packageName, text, icon, bgColor, iconColor, textColor, edges, v, cacheSeconds });
     res.status(500).send('Internal Server Error');
   }
 });
@@ -146,43 +146,16 @@ app.get('/terms', (req, res) => {
 });
 
 /**
- * Debug endpoint to check server status
- */
-app.get('/debug', (req, res) => {
-  const debug = {
-    timestamp: new Date().toISOString(),
-    nodeVersion: process.version,
-    platform: process.platform,
-    arch: process.arch,
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    cwd: process.cwd(),
-    env: {
-      NODE_ENV: process.env.NODE_ENV,
-      PORT: process.env.PORT
-    }
-  };
-  res.json(debug);
-});
-
-/**
- * Simple test endpoint for badge generation
- */
-app.get('/test', async (req, res) => {
-  try {
-    const { generateBadgeSvg } = require('./utils/badgeUtils');
-    const svg = generateBadgeSvg('Test', 'blue', null, 'white', 'squared');
-    res.setHeader('Content-Type', 'image/svg+xml');
-    res.send(svg);
-  } catch (error) {
-    console.error('Test endpoint error:', error);
-    res.status(500).json({ error: error.message, stack: error.stack });
-  }
-});
-
-/**
  * Fire up the server. Logs the port for easy debugging.
  */
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server running on port ${port}`);
+
+  // Initialize persistent storage on server startup
+  try {
+    await initializeMemoryStorage();
+    console.log('Persistent storage initialized successfully');
+  } catch (error) {
+    console.warn('Failed to initialize persistent storage:', error.message);
+  }
 });
