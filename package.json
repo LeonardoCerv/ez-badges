@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A dynamic SVG badge generator inspired by img.shields.io, featuring the ability to use your own image paths and convert them into SVG badges for your README files.",
   "main": "server.js",
+  "license": "MIT",
   "scripts": {
     "start": "node server.js"
   },

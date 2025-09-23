@@ -189,9 +189,9 @@ All contributors will be:
 
 Ready to contribute? Check out our Issues page for good first issues, or create your own feature request!
 
-## License & Terms
+## License
 
-See Terms of Use for detailed usage terms.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
