@@ -90,8 +90,18 @@ function calculateTextWidth(text, fontSize) {
  * @param {string} edges - Corner style
  * @returns {string} Complete SVG
  */
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
   let finalTextColor;
+  if (typeof edges !== 'string') edges = 'squared';
 
   const bgParsed = parseColor(bgColor);
   const bgColorFormatted = `rgb(${bgParsed.r}, ${bgParsed.g}, ${bgParsed.b})`;
@@ -164,7 +174,7 @@ function generateBadgeSvg(text, bgColor, iconData, textColor, edges) {
       font-weight="600"
       font-family="${fontFamily}"
       style="text-rendering: optimizeLegibility;
-      letter-spacing: 0.2em;">${text}</text>` : ''}
+      letter-spacing: 0.2em;">${escapeXml(text)}</text>` : ''}
   </svg>`;
 }
 

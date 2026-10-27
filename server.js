@@ -63,8 +63,17 @@ app.get('/badge', async (req, res) => {
 /**
  * Dynamic badge endpoint. Supports different types like viewers, downloads, etc.
  */
+const REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const PACKAGE_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
 app.get('/badge/dynamic/:type', async (req, res) => {
   const { type } = req.params;
+  if (req.query.repo !== undefined && !REPO_RE.test(String(req.query.repo))) {
+    return res.status(400).send('Invalid repo parameter');
+  }
+  if (req.query.package !== undefined && !PACKAGE_RE.test(String(req.query.package))) {
+    return res.status(400).send('Invalid package parameter');
+  }
   const {
     repo,
     package: packageName,

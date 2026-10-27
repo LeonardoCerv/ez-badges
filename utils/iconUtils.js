@@ -34,7 +34,22 @@ function resolveIconUrl(iconParam) {
  * @param {string} url - Image URL
  * @returns {Buffer|null} Image data or null
  */
+function isAllowedIconUrl(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return false; }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host === '0.0.0.0') return false;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(host)) return false;
+  if (host.includes(':')) return false; // IPv6 literals
+  return true;
+}
+
 async function fetchImage(url) {
+  if (!isAllowedIconUrl(url)) {
+    console.error('Rejected icon URL:', url);
+    return null;
+  }
   try {
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
